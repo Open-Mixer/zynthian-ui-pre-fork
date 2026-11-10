@@ -63,6 +63,8 @@ class fake_plugin_hostd:
         self.descriptors = descriptors or {}
         self.mod_host = mod_host  # answer like mod-host: no plugin-hostd verbs
         self.instances = {}  # instance => uri
+        self.curves = {}  # (instance, display) => the terms of its curve_bind, see verb_curve_bind
+        self.monitors = []  # (instance, output) of each monitor_output
         self.params = {}  # instance => {symbol: value}
         self.patches = {}  # instance => {property uri: the file the plugin was given}
         self.bypass = {}
@@ -354,6 +356,39 @@ class fake_plugin_hostd:
                 self.chains[chain] = tuple(m for m in members if m != n)
         for chain, (segments, reasons) in list(self.plans.items()):
             self.plans[chain] = ([[m for m in s if m != n] for s in segments if s != [n]], reasons)
+        return "resp 0"
+
+    def verb_curve_bind(self, instance, display, kind, family, *terms):
+        """protocol 0.5: a display bound to the instance's parameters; a symbol it does not have is refused (-103)."""
+        n = int(instance)
+        if n not in self.instances:
+            return "resp -3"
+        for term in terms:
+            symbol = term.partition("=")[2].partition(":")[0]
+            if symbol not in self.params[n]:
+                return "resp -103"
+        self.curves[(n, int(display))] = (kind, family, terms)
+        return "resp 0"
+
+    def verb_curve_points(self, instance, display, points):
+        """The points of a bound display: two, the first term's value at both ends; -537 for no binding."""
+        n = int(instance)
+        if n not in self.instances:
+            return "resp -3"
+        bound = self.curves.get((n, int(display)))
+        if not bound:
+            return "resp -537"
+        v = self.params[n][bound[2][0].partition("=")[2].partition(":")[0]] if bound[2] else 0.0
+        return f"resp 0 2 20,{v:.2f} 20000,{v:.2f}"
+
+    def forget_curves(self):
+        """What a respawned instance is: its bindings gone."""
+        self.curves.clear()
+
+    def verb_monitor_output(self, instance, symbol):
+        if int(instance) not in self.instances:
+            return "resp -3"
+        self.monitors.append((int(instance), symbol))
         return "resp 0"
 
     def verb_show_external_ui(self, instance):

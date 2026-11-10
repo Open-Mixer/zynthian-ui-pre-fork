@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# A stand-in for `omx-panel describe --descriptor <file> [--pages --per-page N] [--remote <file>]` and `compare`:
+# A stand-in for `omx-panel describe --descriptor <file> [--pages --per-page N | --layout] [--remote <file>]` and `compare`:
 # it replays what the real omx-panel (main after its pages PR) printed for the descriptors of this directory, kept
 # beside them as <name>.describe.json (no --pages) and <name>.pages<N>.json (--pages --per-page N); OMX_PANEL_REAL
 # (test_engine_plugin_hostd) runs the real command and compares it with these files, so they cannot drift. A width or a
@@ -39,6 +39,19 @@ if argv[:1] != ["describe"]:
     sys.exit(f"unknown command {argv[:1]}")
 path = argv[argv.index("--descriptor") + 1]
 base = path[:-len(".descriptor.json")] if path.endswith(".descriptor.json") else path
+if "--layout" in argv:
+    # the layout the renderer draws: <name>.layout.json when recorded, else one with nothing a screen draws (no bar
+    # group, display or meter); OMX_PANEL_STUB_NO_LAYOUT is an omx-panel before --layout, which prints the description
+    if not os.environ.get("OMX_PANEL_STUB_NO_LAYOUT"):
+        golden = f"{base}.layout.json"
+        if os.path.exists(golden):
+            with open(golden) as f:
+                print(f.read())
+        else:
+            print(json.dumps({"sections": [{"key": "controls", "label": "Controls"}], "controls": [], "displays": [],
+                              "meters": []}))
+        sys.exit(0)
+    argv.remove("--layout")
 if "--pages" not in argv:
     kind = "describe"
 else:

@@ -122,6 +122,8 @@ class plugin_hostd_case(unittest.TestCase):
         self.addCleanup(lambda: (ph.daemon.stop(), ph.daemon.client.close()))
         ph._logged.clear()
         ph.layout_cache.clear()
+        ph.drawn_cache.clear()
+        ph.description_cache.clear()
         os.environ.pop("OMX_PANEL_STUB_OLD", None)
         ph.probe_cache.clear()
         ph.DESCRIPTOR_WAIT = 0.5
@@ -206,8 +208,8 @@ class test_daemon(plugin_hostd_case):
         proc = self.add(chain, "PH/Amp")
         started = ph.daemon.pid
         self.assertIsNotNone(started, "no daemon answered, so the engine starts one")
-        self.assertEqual(self.started(), [f"{self.port} PHD_CONF={ph.daemon.conf}"],
-                         "through zynthian-sys's script, on the engine's port, with its config")
+        self.assertEqual(self.started(), [f"{self.port} {self.port + 1} PHD_CONF={ph.daemon.conf}"],
+                         "through zynthian-sys's script, on the engine's port and the feedback port after it, with its config")
         self.assertEqual({pid for pid, _ in self.journal()}, {str(started)}, "the add reached the started process")
         self.assertIn([str(started), "add urn:test:amp 1000"], self.journal())
         self.remove(chain, proc)
@@ -1205,6 +1207,8 @@ class test_easy(plugin_hostd_case):
         proc.engine.remote_ids = lambda dcontrols: [{"name": "Macros", "ids": ["p3", "p5"]}]
         proc.engine.pages_cache = None
         ph.layout_cache.clear()
+        ph.drawn_cache.clear()
+        ph.description_cache.clear()
         self.assertEqual([(n, [r[0] if r else None for r in rows]) for n, rows in proc.engine.pages()][:2],
                          [("Easy", ["p3", "p1", None, None]), ("Macros", ["p3", "p5", None, None])],
                          "a declared page is not edited: the Easy control may sit on it too")

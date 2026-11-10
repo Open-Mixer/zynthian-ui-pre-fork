@@ -35,6 +35,7 @@ from zyngine import zynthian_plugin_hostd_grouping
 from zyngine import zynthian_plugin_hostd_estimate
 from zyngine import zynthian_plugin_qualification
 from zyngine import zynthian_plugin_tiers
+from zyngine import zynthian_omx_panel_view as panel_view
 from zyngine.zynthian_engine import zynthian_engine
 from zyngine.zynthian_controller import zynthian_controller
 from zyngine.zynthian_plugin_hostd_catalogue import clap_plugins
@@ -128,11 +129,61 @@ HELLO = "hello 1 tags errors"  # protocol 0.3 of plugin-hostd-protocol: tags and
 HELLO_EXTENSIONS = ("tags", "errors")
 
 
+class plugin_hostd_feedback:
+    """The daemon's feedback port, read by a thread of its own: the last value of each output a monitor_output asked
+    for (a meter), by (instance, symbol). A daemon started with a feedback port serves no command until a client takes
+    that port, so the command connection takes it as it opens; a daemon with none (one an older UI started) refuses it,
+    and the panels then draw their meters' frames alone."""
+
+    def __init__(self, port, host="127.0.0.1"):
+        self.host = host
+        self.port = port
+        self.sock = None
+        self.values = {}
+        self.generation = 0  # one more for each connection: a monitor ends with the connection that set it
+
+    def connect(self):
+        self.close()
+        try:
+            self.sock = socket.create_connection((self.host, self.port), timeout=1.0)
+        except OSError as e:
+            log_once("feedback", "plugin-hostd has no feedback port %s (%s): the panels' meters stand still", self.port, e)
+            return
+        self.generation += 1
+        threading.Thread(target=self.read, args=(self.sock,), daemon=True, name="plugin-hostd feedback").start()
+
+    def close(self):
+        if self.sock:
+            try:
+                self.sock.close()
+            except OSError:
+                pass
+        self.sock = None
+
+    def read(self, sock):
+        buf = b""
+        sock.settimeout(None)
+        while True:
+            try:
+                chunk = sock.recv(4096)
+            except OSError:
+                return
+            if not chunk:
+                return
+            buf += chunk
+            *lines, buf = buf.split(b"\0")
+            for line in lines:
+                out = panel_view.output_set(line.decode(errors="replace"))
+                if out:
+                    self.values[out[:2]] = out[2]
+
+
 class plugin_hostd_client:
 
     def __init__(self, port, host="127.0.0.1"):
         self.host = host
         self.port = port
+        self.feedback = plugin_hostd_feedback(port + 1, host)
         self.sock = None
         self.buf = b""
         self.version = None  # the protocol version the daemon answered hello with; None for a daemon that does not
@@ -143,6 +194,7 @@ class plugin_hostd_client:
         if self.sock:
             self.sock.close()
         self.sock = None
+        self.feedback.close()
         self.buf = b""
         self.version = None
         self.granted = ()
@@ -203,6 +255,7 @@ class plugin_hostd_client:
         try:
             if self.sock is None:
                 self.sock = socket.create_connection((self.host, self.port), timeout=TIMEOUT)
+                self.feedback.connect()
                 self.hello()
             reply = self.exchange(line, timeout)
         except OSError:
@@ -272,7 +325,7 @@ class plugin_hostd_daemon:
             raise plugin_hostd_down(f"no daemon on port {port} and {self.start_script} is not installed")
         # The script returns once the daemon prints the line it declares for ready, and prints its PID; it
         # prints none for a daemon that was already running, which is then not this process's to stop
-        cmd = [self.start_script, str(port)]
+        cmd = [self.start_script, str(port), str(self.client.feedback.port)]  # the meters come on the feedback port
         env = dict(os.environ, PHD_CONF=self.conf, READY_TIMEOUT=str(int(START_TIMEOUT)))
         logging.info(f"Starting plugin-hostd: {' '.join(cmd)}")
         try:
@@ -1034,6 +1087,7 @@ def plan_refused(chain_id, members, e):
 SURFACE_WIDTH = 4  # the controls a Zynthian screen shows, one per encoder: the one declaration of the page width here
 
 layout_cache = {}  # (descriptor path, mtime, width, remote) => (pages, the description's controls by symbol)
+description_cache = {}  # (descriptor path, mtime) => the description panel_layout read
 
 
 def symbol_of(param):
@@ -1071,7 +1125,9 @@ def panel_layout(path, width=None, remote=None):
             return json.loads(subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=30).stdout)
 
         pages = run("--pages", "--per-page", str(width), *extra)
-        controls = run()["description"].get("controls", [])
+        description = run()["description"]
+        controls = description.get("controls", [])
+        description_cache[(path, key[1])] = description
     except (OSError, ValueError, KeyError, subprocess.SubprocessError) as e:
         log_once(("omx-panel", path), "omx-panel describe of %s failed (%s): plugin-hostd has no controller pages", path, e)
         return None
@@ -1080,6 +1136,42 @@ def panel_layout(path, width=None, remote=None):
             os.unlink(remote_file)
     layout_cache[key] = (pages, {str(c["symbol"]): c for c in controls})
     return layout_cache[key]
+
+
+drawn_cache = {}  # (descriptor path, mtime) => (the layout the renderer draws, the description), or None
+
+
+def panel_drawn(path):
+    """What the panel's own screen draws with omx-panel's renderer: (layout, description), the layout from
+    `describe --layout` (the derivation's, its displays included) and the description its curve terms are bound by.
+    None, said once, when omx-panel cannot give them (not installed, or one with no --layout)."""
+    try:
+        key = (path, os.stat(path).st_mtime)
+    except OSError:
+        return None
+    if key in drawn_cache:
+        return drawn_cache[key]
+    drawn_cache[key] = None
+    panel = shutil.which("omx-panel")
+    if not panel:
+        log_once("omx-panel", "omx-panel is not installed: plugin-hostd has no controller pages")
+        return None
+    try:
+        def run(*args):
+            cmd = [panel, "describe", "--descriptor", path, *args]
+            return json.loads(subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=30).stdout)
+
+        layout = run("--layout")
+        description = description_cache.get(key) or run()["description"]
+        if not isinstance(description, dict) or not isinstance(layout, dict) or "description" in layout \
+                or not isinstance(layout.get("sections"), list):
+            raise ValueError("this omx-panel prints no layout for describe --layout")
+    except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as e:
+        log_once(("omx-panel layout", path), "omx-panel describe --layout of %s failed (%s): the panel has no drawn view",
+                 path, e)
+        return None
+    drawn_cache[key] = (layout, description)
+    return drawn_cache[key]
 
 
 probe_cache = {}  # plugin uri => the descriptor file plugin-hostd-probe describe wrote, None when it refused
@@ -1143,6 +1235,9 @@ class zynthian_engine_plugin_hostd(zynthian_engine):
         self._ctrls = []
         self._ctrl_screens = []
         self.screen_pages = []
+        self.drawn = None  # (layout, description) of the panel's drawn view, see panel_drawn
+        self.curves_bound = {}  # display index => the curve_bind line the daemon holds for it
+        self.monitored = {}  # meter symbol => the feedback connection its monitor_output was set on
         self.options['ctrl_fb'] = False
 
     def add_processor(self, processor):
@@ -1155,6 +1250,7 @@ class zynthian_engine_plugin_hostd(zynthian_engine):
             self.generate_ctrl_screens(self.zctrls)
             self.path_zctrls = self.build_path_controllers()
             self.generate_ctrl_screens(self.path_zctrls)
+            self.set_drawn_view()
             if self.pending_state:
                 self.load_state(self.pending_state)
                 self.pending_state = None
@@ -1229,6 +1325,64 @@ class zynthian_engine_plugin_hostd(zynthian_engine):
         if self.instance is not None:
             daemon.remove(self.instance)
             self.instance = None
+        self.curves_bound = {}
+        self.monitored = {}
+
+    # ---- The drawn view: the bars, curves and meters of the panel, drawn by omx-panel's renderer ----
+
+    def set_drawn_view(self):
+        """The panel's own screen (zynthian_widget_omx_panel) for a plugin whose panel has a bar group, a curve or a
+        meter, for CLAP and LV2 alike: what the plain controller screens cannot show. Any other keeps them alone."""
+        path = self.descriptor_path()
+        self.drawn = panel_drawn(path) if path else None
+        if self.drawn and panel_view.drawn_parts(self.drawn[0]):
+            self.custom_gui_fpath = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "zyngui",
+                                                 "zynthian_widget_omx_panel.py")
+        else:
+            self.custom_gui_fpath = None
+
+    def curve(self, display):
+        """The points of display `display` of the description, as plugin-hostd computes them from the plugin's values
+        now (curve_bind once, then curve_points); [] when it draws none (its reply says why, logged once)."""
+        if not self.drawn or self.instance is None:
+            return []
+        description = self.drawn[1]
+        line = panel_view.curve_bind_line(self.instance, display, description)
+        if not line:
+            return []
+        for attempt in (0, 1):
+            try:
+                if self.curves_bound.get(display) != line:
+                    daemon.call(line)
+                    self.curves_bound[display] = line
+                return panel_view.curve_points(daemon.call(f"curve_points {self.instance} {display} 96")[1])
+            except plugin_hostd_error as e:
+                # a respawned instance lost its binding: bind again, once
+                self.curves_bound.pop(display, None)
+                if attempt or e.code != protocol.codes.get("CURVE_TERM_MISSING"):
+                    log_once(("curve", self.plugin_uri, display), "plugin-hostd draws no curve %s for %s: %s", display,
+                             self.plugin_uri, e)
+                    return []
+            except (OSError, plugin_hostd_down, plugin_hostd_timeout) as e:
+                log_once(("curve", self.plugin_uri, display), "plugin-hostd draws no curve %s for %s: %s", display,
+                         self.plugin_uri, e)
+                return []
+        return []
+
+    def meter(self, symbol):
+        """The last reading of output `symbol` (a meter) from the feedback port, None until one came. The monitor is
+        asked once per feedback connection."""
+        if self.instance is None:
+            return None
+        fb = daemon.client.feedback
+        if fb.sock is not None and self.monitored.get(symbol) != fb.generation:
+            self.monitored[symbol] = fb.generation
+            try:
+                daemon.call(f"monitor_output {self.instance} {symbol}")
+            except (OSError, *FAILURES) as e:
+                log_once(("meter", self.plugin_uri, symbol), "plugin-hostd monitors no %s for %s: %s", symbol,
+                         self.plugin_uri, e)
+        return fb.values.get((self.instance, symbol))
 
     def replay_lines(self, bulk=False):
         """What puts the instance back in a daemon that lost it: the add, the preset, every value. bulk: the values
