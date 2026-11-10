@@ -29,6 +29,7 @@ import logging
 # Zynthian specific modules
 import zynautoconnect
 from zyngine.zynthian_processor import zynthian_processor
+from zyngine.zynthian_engine_plugin_hostd import sync_chain as plugin_hostd_sync_chain
 from zyncoder.zyncore import lib_zyncore
 
 
@@ -198,11 +199,21 @@ class zynthian_chain:
 
         self.init_MPE()
 
+    # Plugins that take MPE, by name: the engine prefix (JV/ jalv, PH/ plugin-hostd) does not decide it
+    MPE_PLUGINS = ("Surge XT", "OB-Xf", "TAL U-No-LX-V2")
+
+    @classmethod
+    def eng_code_has_MPE(cls, eng_code):
+        prefix, _, name = eng_code.partition("/")
+        if prefix in ("JV", "PH"):
+            return name in cls.MPE_PLUGINS
+        return eng_code in cls.MPE_PLUGINS
+
     # Enable/Disable MPE for supported synth engines:
     def init_MPE(self):
         if self.is_synth():
             synth_proc = self.synth_slots[0][0]
-            if synth_proc.eng_code in ("JV/Surge XT", "JV/OB-Xf", "TAL U-No-LX-V2"):
+            if self.eng_code_has_MPE(synth_proc.eng_code):
                 if self.midi_chan == 0xFFFF:
                     self.init_MPE_zone(0x0, 15)
                 else:
@@ -313,6 +324,9 @@ class zynthian_chain:
     def rebuild_audio_graph(self):
         """Build dictionary of lists of sources mapped by destination"""
 
+        # plugin-hostd runs each serial run of this chain's plugins in one worker, in this order
+        plugin_hostd_sync_chain(self)
+
         # TODO: This is called too frequently
         if not zynautoconnect.acquire_lock():
             return
@@ -343,6 +357,8 @@ class zynthian_chain:
                 for jackname in sources:
                     if jackname.startswith("zynmixer"):
                         jackname = jackname.replace("output_", "input_")
+                    elif jackname in self.audio_routes:
+                        continue  # a later member of a worker's one jack client: the client is fed by its first
                     self.audio_routes[jackname] = prev_slot_sources.copy()
                 prev_slot_sources = sources
 

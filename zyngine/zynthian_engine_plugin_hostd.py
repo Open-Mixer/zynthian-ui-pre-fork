@@ -1,0 +1,1987 @@
+# -*- coding: utf-8 -*-
+# ******************************************************************************
+# ZYNTHIAN PROJECT: Zynthian Engine (zynthian_engine_plugin_hostd)
+#
+# zynthian_engine implementation for plugin-hostd: LV2 and CLAP plugins, each processor
+# one instance of a shared daemon that speaks the mod-host protocol on its command port.
+#
+# Copyright (C) 2026 Pau Aliagas <linuxnow@gmail.com>
+#
+# This program is free software; you can redistribute it and/or modify it under the terms
+# of the GNU General Public License as published by the Free Software Foundation; either
+# version 2 of the License, or any later version. See the LICENSE.txt file.
+# ******************************************************************************
+
+import io
+import os
+import re
+import json
+import time
+import base64
+import shlex
+import shutil
+import signal
+import socket
+import logging
+import tarfile
+import tempfile
+import threading
+import subprocess
+
+import zynautoconnect
+from zyngine.zynthian_signal_manager import zynsigman
+from zyngine import zynthian_plugin_hostd_protocol
+from zyngine import zynthian_plugin_hostd_grouping
+from zyngine import zynthian_plugin_hostd_estimate
+from zyngine import zynthian_plugin_qualification
+from zyngine import zynthian_plugin_tiers
+from zyngine import zynthian_omx_panel_view as panel_view
+from zyngine.zynthian_engine import zynthian_engine
+from zyngine.zynthian_controller import zynthian_controller
+from zyngine.zynthian_plugin_hostd_catalogue import clap_plugins
+
+__all__ = ["zynthian_engine_plugin_hostd"]
+
+# The command port. mod-host owns 5555 on a Zynthian, so the daemon takes another one.
+DEFAULT_PORT = int(os.environ.get("ZYNTHIAN_PLUGIN_HOSTD_PORT", "5570"))
+# Four-digit instance numbers, so no client name effect_N is a prefix of another one.
+FIRST_INSTANCE = 1000
+LAST_INSTANCE = 9989
+TIMEOUT = 5.0
+COMPARE_SLOTS = ("A", "B", "C", "D")  # omx-panel's COMPARE_SLOTS, the menu's rows
+COMPARE_PAUSE = 1.0  # seconds: controller moves closer than this are one undo step
+COMPARE_QUEUE = 64  # steps waiting for the next omx-panel run, its ring's bound
+RUN_NUMBERS = 1000  # a chain's serial runs numbered to the daemon, see run_number
+# The verb that tells plugin-hostd the user chose a plugin below our bar (its pin refused, or it crashed in qualification)
+ACCEPT_VERB = "pin_accept"
+REVOKE_VERB = "pin_clear"
+RELOAD_VERB = "pin_reload"
+# Below-bar reasons that run a plugin in a worker of its own
+ISOLATE_REASONS = ("refused", "crashed", "hung")
+qualification = zynthian_plugin_qualification.qualification()
+RETRY_S = 60.0  # a run the daemon refused, or planned alone for a reason that can change, is asked again after this
+RETRY_REASONS = ("no-verdict", "plan-refused:")  # plan_get reasons that the qualification sync or a pin can lift
+WATCH_S = 2.0  # how often the grouped workers are read back, to follow what the daemon moves by itself
+SLOW_TIMEOUT = 30.0  # add, chain, state_save and state_load spawn or move workers
+START_TIMEOUT = 10.0  # the wait for the daemon's declared line, in plugin-hostd-start.sh
+START_SCRIPT = os.path.join(os.environ.get("ZYNTHIAN_SYS_DIR", "/zynthian/zynthian-sys"), "sbin",
+                            "plugin-hostd-start.sh")
+DESCRIPTOR_WAIT = 5.0
+PROBE_TIMEOUT = 30.0
+# The worker rows whose chain is one JACK client, named like its head (measured on a Pi 5 with plugin-hostd
+# 0.12.0 and omx-clap-host 0.22.1, jack_lsp on a private server: a chain on the clap row, and one on the
+# lv2-clap row, LV2 members included, is the one client effect_<head> with the chain's ports; a chain on the
+# lv2 row, run by mod-host, keeps a client per member). plugin-hostd declares the row, not the client, so
+# this is the one fact here that comes from a measurement; a row not listed keeps a client per member.
+ONE_CLIENT_ROWS = ("clap", "lv2-clap")
+STATE_FILE_RE = re.compile(r"^effect_(\d+)(?=\D|$)")
+
+# The reply codes are plugin-hostd's own declaration, never retyped here. They are read once, here; without the
+# files, or without a name below, the engine refuses to start and says which. Ready, the line the daemon declares,
+# is waited for by zynthian-sys's plugin-hostd-start.sh, the one place a plugin-hostd is started on a Zynthian.
+CHAIN_FALLBACK_NAMES = ("PLACEMENT_INVALID", "CHAIN_DUPLICATE", "CHAIN_INSTANCE_BUSY", "CHAIN_MIXED_FORMAT")
+DESCRIPTOR_NONE_NAMES = ("DESCRIPTOR_ABSENT", "DESCRIPTOR_SCAN_FAILED")
+NEEDS = CHAIN_FALLBACK_NAMES + DESCRIPTOR_NONE_NAMES + (
+    "DESCRIPTOR_PENDING", "ERR_INSTANCE_ALREADY_EXISTS", "ERR_INVALID_OPERATION", "ERR_MEMORY_ALLOCATION")
+protocol = zynthian_plugin_hostd_protocol.protocol(needs=NEEDS)
+ERROR_NAMES = protocol.names
+uri_word = zynthian_plugin_hostd_protocol.uri_word
+CHAIN_FALLBACK_CODES = tuple(protocol.codes[n] for n in CHAIN_FALLBACK_NAMES) if protocol.loaded else ()
+DESCRIPTOR_PENDING = protocol.codes.get("DESCRIPTOR_PENDING")
+DESCRIPTOR_NONE = tuple(protocol.codes[n] for n in DESCRIPTOR_NONE_NAMES) if protocol.loaded else ()
+
+_logged = set()
+
+
+def log_once(key, msg, *args):
+    if key not in _logged:
+        _logged.add(key)
+        logging.warning(msg, *args)
+
+
+class plugin_hostd_error(Exception):
+    """A negative reply, carrying its code and its name."""
+
+    def __init__(self, code, line, word=None, position=None):
+        self.code = code
+        self.word = word  # the error word of a session granted errors, reply.<group>.<reason>
+        self.position = position  # the pair a bulk line was refused at, from 1
+        self.name = word or protocol.name(code)  # the word when the daemon says it, else the protocol file's name
+        self.meaning = protocol.meaning(code)
+        at = f" at {position}" if position else ""
+        super().__init__(f"'{line}' => {self.name} ({code}){at}")
+
+
+class plugin_hostd_down(Exception):
+    """No daemon answers and none could be started."""
+
+
+class plugin_hostd_timeout(Exception):
+    """The daemon took longer than the timeout to answer."""
+
+
+FAILURES = (plugin_hostd_error, plugin_hostd_down, plugin_hostd_timeout)
+
+
+# ---- Protocol client: one NUL-terminated line out, one NUL-terminated reply back ----
+
+HELLO = "hello 1 tags errors"  # protocol 0.3 of plugin-hostd-protocol: tags and error words; seq is for the feedback port
+HELLO_EXTENSIONS = ("tags", "errors")
+
+
+class plugin_hostd_feedback:
+    """The daemon's feedback port, read by a thread of its own: the last value of each output a monitor_output asked
+    for (a meter), by (instance, symbol). A daemon started with a feedback port serves no command until a client takes
+    that port, so the command connection takes it as it opens; a daemon with none (one an older UI started) refuses it,
+    and the panels then draw their meters' frames alone."""
+
+    def __init__(self, port, host="127.0.0.1"):
+        self.host = host
+        self.port = port
+        self.sock = None
+        self.values = {}
+        self.generation = 0  # one more for each connection: a monitor ends with the connection that set it
+
+    def connect(self):
+        self.close()
+        try:
+            self.sock = socket.create_connection((self.host, self.port), timeout=1.0)
+        except OSError as e:
+            log_once("feedback", "plugin-hostd has no feedback port %s (%s): the panels' meters stand still", self.port, e)
+            return
+        self.generation += 1
+        threading.Thread(target=self.read, args=(self.sock,), daemon=True, name="plugin-hostd feedback").start()
+
+    def close(self):
+        if self.sock:
+            try:
+                self.sock.close()
+            except OSError:
+                pass
+        self.sock = None
+
+    def read(self, sock):
+        buf = b""
+        sock.settimeout(None)
+        while True:
+            try:
+                chunk = sock.recv(4096)
+            except OSError:
+                return
+            if not chunk:
+                return
+            buf += chunk
+            *lines, buf = buf.split(b"\0")
+            for line in lines:
+                out = panel_view.output_set(line.decode(errors="replace"))
+                if out:
+                    self.values[out[:2]] = out[2]
+
+
+class plugin_hostd_client:
+
+    def __init__(self, port, host="127.0.0.1"):
+        self.host = host
+        self.port = port
+        self.feedback = plugin_hostd_feedback(port + 1, host)
+        self.sock = None
+        self.buf = b""
+        self.version = None  # the protocol version the daemon answered hello with; None for a daemon that does not
+        self.granted = ()  # the extensions it granted
+        self.tag_count = 0
+
+    def close(self):
+        if self.sock:
+            self.sock.close()
+        self.sock = None
+        self.feedback.close()
+        self.buf = b""
+        self.version = None
+        self.granted = ()
+
+    def read_line(self, line, deadline, timeout):
+        """The next NUL-terminated reply, as text."""
+        try:
+            while b"\0" not in self.buf:
+                left = deadline - time.monotonic()
+                if left <= 0:
+                    raise socket.timeout()
+                self.sock.settimeout(left)
+                chunk = self.sock.recv(4096)
+                if not chunk:
+                    raise ConnectionResetError("plugin-hostd closed the connection")
+                self.buf += chunk
+        except socket.timeout:
+            # The reply may still come: drop the connection so it is never read as the next one
+            self.close()
+            raise plugin_hostd_timeout(f"'{line}' got no reply in {timeout}s")
+        reply, _, self.buf = self.buf.partition(b"\0")
+        return reply.decode(errors="replace")
+
+    def exchange(self, line, timeout):
+        """Send a line; the raw text of its reply. With tags granted the line carries a tag of its own and the
+        replies of any other tag are dropped: they answer a request that nobody waits for any more."""
+        deadline = time.monotonic() + timeout
+        tag = None
+        if "tags" in self.granted:
+            self.tag_count += 1
+            tag = f"@z{self.tag_count}"
+        try:
+            self.sock.settimeout(timeout)
+            self.sock.sendall((f"{tag} {line}" if tag else line).encode() + b"\0")
+            while True:
+                reply = self.read_line(line, deadline, timeout)
+                if tag is None:
+                    return reply
+                head, _, rest = reply.partition(" ")
+                if head == tag:
+                    return rest
+                logging.debug(f"plugin-hostd reply '{reply[:64]}' is not for {tag}, dropped")
+        except OSError:
+            self.close()
+            raise
+
+    def hello(self):
+        """Open the session: ask for the protocol 0.3 extensions. A daemon that does not know hello (not found, or
+        the refusal of an invalid operation) is an older one, and the session stays as it was: no tags, no error words, no bulk verbs."""
+        words = self.exchange(HELLO, TIMEOUT).split()
+        if len(words) >= 3 and words[0] == "resp" and words[1] == "0" and words[2].isdigit():
+            self.version = int(words[2])
+            self.granted = tuple(w for w in words[3:] if w in HELLO_EXTENSIONS)
+
+    def call(self, line, timeout=TIMEOUT):
+        """Send a line, return (code, rest) or raise plugin_hostd_error for a negative code.
+        A connection error is raised as OSError; a timeout as plugin_hostd_timeout."""
+        try:
+            if self.sock is None:
+                self.sock = socket.create_connection((self.host, self.port), timeout=TIMEOUT)
+                self.feedback.connect()
+                self.hello()
+            reply = self.exchange(line, timeout)
+        except OSError:
+            self.close()
+            raise
+        words = reply.split(" ", 2)
+        if len(words) < 2 or words[0] != "resp":
+            raise plugin_hostd_error(protocol.code("ERR_INVALID_OPERATION"), f"{line} (reply '{reply[:64]}')")
+        code = int(words[1])
+        rest = words[2] if len(words) > 2 else ""
+        if code < 0:
+            # The daemon's word for the code, when it was granted errors; the pair a bulk line was refused at
+            head, _, tail = rest.partition(" ")
+            word = head if head.startswith("reply.") else None
+            if word:
+                rest = tail
+            raise plugin_hostd_error(code, line, word, int(rest) if rest.isdigit() else None)
+        return code, rest
+
+
+# ---- The daemon: started when none answers, reused when one does (a service, or another UI started it) ----
+
+class plugin_hostd_daemon:
+
+    def __init__(self, port=DEFAULT_PORT):
+        self.client = plugin_hostd_client(port)
+        self.lock = threading.RLock()  # the watch and the estimate ask from threads of their own, on the one connection
+        self.start_script = START_SCRIPT
+        self.conf = os.environ.get("ZYNTHIAN_PLUGIN_HOSTD_CONF",
+                                   os.path.join(zynthian_engine.config_dir, "plugin-hostd.conf"))
+        self.pid = None  # set only when this process started the daemon
+        self.engines = {}  # instance number => engine
+        self.runs = {}  # zynthian chain id => {run number: member instances}, see run_number
+        self.chains = {}  # run number => member instances declared to the daemon
+        self.chain_refused = {}  # run number => members the daemon refused to run together
+        self.clients = {}  # run number => {member instance: jack client of the run's worker}
+        self.plans = {}  # run number => member instances the daemon planned
+        self.reasons = {}  # member instance => the reason word plan_get gave for it
+        self.plan_verbs = None  # whether the daemon answers plan: None until it was asked
+        self.grouping = None  # False once a plan came back with grouping-off; None while that is not known
+        self.bulk_verbs = None  # whether the daemon answers param_get_many and param_set_many: False once it refused them
+        self.estimate_verb = None  # whether the daemon answers estimate: False once it refused it, for the session
+        self.chain_figures = {}  # zynthian chain id => (steps, rate, quantum, footer text) of the chain as it is
+        self.asked_at = {}  # run number => when it was last refused, or planned with a reason that can change
+        self.pending = {}  # zynthian chain id => chain whose runs wait for the end of a busy section, see sync_chain
+        self.synced = {}  # zynthian chain id => chain whose runs were declared, read back by the watch
+        self.watch = None  # the thread that reads the grouped workers back, see watch_workers
+
+    def identify(self):
+        """True when a plugin-hostd answers on the port: mod-host refuses worker_list."""
+        try:
+            self.client.call("worker_list")
+            return True
+        except plugin_hostd_error:
+            self.client.close()
+            raise plugin_hostd_down(f"something that is not plugin-hostd answers on port {self.client.port}")
+        except (OSError, plugin_hostd_timeout):
+            return False
+
+    def ensure(self):
+        if not protocol.loaded:
+            raise plugin_hostd_down(protocol.failure)
+        if self.identify():
+            return
+        port = self.client.port
+        if not os.access(self.start_script, os.X_OK):
+            raise plugin_hostd_down(f"no daemon on port {port} and {self.start_script} is not installed")
+        # The script returns once the daemon prints the line it declares for ready, and prints its PID; it
+        # prints none for a daemon that was already running, which is then not this process's to stop
+        cmd = [self.start_script, str(port), str(self.client.feedback.port)]  # the meters come on the feedback port
+        env = dict(os.environ, PHD_CONF=self.conf, READY_TIMEOUT=str(int(START_TIMEOUT)))
+        logging.info(f"Starting plugin-hostd: {' '.join(cmd)}")
+        try:
+            done = subprocess.run(cmd, stdin=subprocess.DEVNULL, capture_output=True, text=True, env=env,
+                                  timeout=START_TIMEOUT + 5, start_new_session=True)
+        except (OSError, subprocess.SubprocessError) as e:
+            raise plugin_hostd_down(f"{' '.join(cmd)} failed: {e}")
+        if done.returncode != 0:
+            why = (done.stderr.strip().splitlines() or [f"exit code {done.returncode}"])[-1]
+            raise plugin_hostd_down(f"{' '.join(cmd)} => {why}")
+        pid = done.stdout.strip()
+        self.pid = int(pid) if pid.isdigit() else None
+
+    def call(self, line, timeout=TIMEOUT):
+        """One command; if the connection is gone, bring the daemon back, replay and send it again."""
+        with self.lock:
+            if self.client.sock is None:
+                self.restore()
+            try:
+                return self.client.call(line, timeout)
+            except OSError as e:
+                logging.warning(f"plugin-hostd connection lost ({e}), restoring")
+            self.restore()
+            return self.client.call(line, timeout)
+
+    def restore(self):
+        self.client.close()
+        self.ensure()
+        self.identify()  # the connection, and its hello, before the replay chooses its lines
+        self.runs = {}
+        self.chains = {}
+        self.chain_refused = {}
+        self.clients = {}
+        self.plans = {}
+        self.reasons = {}
+        self.asked_at = {}
+        self.plan_verbs = None  # the daemon that came back may be another version, with another setting
+        self.grouping = None
+        self.bulk_verbs = None
+        for instance in sorted(self.engines):
+            for line in self.engines[instance].replay_lines(self.bulk_ok()):
+                try:
+                    self.client.call(line, SLOW_TIMEOUT)
+                except plugin_hostd_error as e:
+                    if line.startswith("param_set_many "):
+                        # All or nothing, and refused: the values go one by one, as an old daemon takes them
+                        self.bulk_refused(e)
+                        self.replay_each(instance)
+                        continue
+                    # An instance that outlived the connection has nothing to put back
+                    outlived = e.code == protocol.code("ERR_INSTANCE_ALREADY_EXISTS")
+                    if not outlived:
+                        logging.error(f"plugin-hostd replay => {e}")
+                    if line.startswith("add ") or outlived:
+                        break
+        for chain_manager in {id(e.chain_manager): e.chain_manager for e in self.engines.values()}.values():
+            for chain in list(chain_manager.chains.values()):
+                sync_chain(chain)
+
+    def replay_each(self, instance):
+        for line in self.engines[instance].param_lines():
+            try:
+                self.client.call(line, SLOW_TIMEOUT)
+            except plugin_hostd_error as e:
+                logging.error(f"plugin-hostd replay => {e}")
+
+    def bulk_ok(self):
+        """True when param_get_many and param_set_many are worth asking: the daemon answered hello, so it is of
+        protocol 0.3, and it has not refused them yet. An older daemon is never asked."""
+        return self.client.version is not None and self.bulk_verbs is not False
+
+    def bulk_refused(self, error):
+        """A bulk line was refused. A refusal of the whole verb (an invalid operation, no pair named) means the daemon
+        does not serve it, for the session; a refusal at a symbol or a pair is that line's own."""
+        if error.code == protocol.code("ERR_INVALID_OPERATION") and error.position is None:
+            self.bulk_verbs = False
+
+    def accept_below_bar(self, uri):
+        """The user chose a plugin below our bar: tell the daemon it is the user's choice, so its add is taken. The one
+        place that names the verb. A refusal is logged and the add goes on: if it is refused too, it says why."""
+        try:
+            self.call(f"{ACCEPT_VERB} {uri_word(uri)}")
+        except plugin_hostd_error as e:
+            logging.warning(f"plugin-hostd {ACCEPT_VERB} {uri} => {e}")
+
+    def revoke_below_bar(self, uri):
+        """The bar is qualified only: take back the user's choice the daemon may keep of this plugin, from an earlier time
+        under a lower bar (the daemon keeps it across restarts), so its pin is refused again and the add says why. The one
+        place that names the verbs: pin_clear forgets the pin with the choice, so the pin file is read again (pin_reload) to
+        put its refusal back. A refusal is logged and the add goes on."""
+        try:
+            self.call(f"{REVOKE_VERB} {uri_word(uri)}")
+            self.call(RELOAD_VERB)
+        except plugin_hostd_error as e:
+            logging.warning(f"plugin-hostd {REVOKE_VERB} {uri} => {e}")
+
+    def add(self, engine, uri, placement=None):
+        """Add the plugin under the first free instance number and register the engine. placement: own for a plugin
+        that runs in a worker of its own, None for the daemon's own choice."""
+        for instance in range(FIRST_INSTANCE, LAST_INSTANCE + 1):
+            if instance not in self.engines:
+                try:
+                    self.call(f"add {uri_word(uri)} {instance}" + (f" {placement}" if placement else ""), SLOW_TIMEOUT)
+                    self.engines[instance] = engine
+                    return instance
+                except plugin_hostd_error as e:
+                    if e.code != protocol.code("ERR_INSTANCE_ALREADY_EXISTS"):  # taken by another controller of this daemon
+                        raise
+        raise plugin_hostd_error(protocol.code("ERR_MEMORY_ALLOCATION"), f"add {uri}")
+
+    def remove(self, instance):
+        with self.lock:
+            self.engines.pop(instance, None)
+            self.reasons.pop(instance, None)
+            try:
+                self.client.call(f"remove {instance}")
+            except (plugin_hostd_error, plugin_hostd_timeout, OSError) as e:
+                logging.warning(f"plugin-hostd remove {instance} => {e}")
+            if not self.engines:
+                # The daemon serves one controller at a time: let another one in
+                self.stop() if self.pid else self.client.close()
+
+    def stop(self):
+        """Stop the daemon, only if this process started it."""
+        if not self.pid:
+            return
+        try:
+            self.client.call("quit", 2.0)
+        except (OSError, *FAILURES):
+            pass
+        self.client.close()
+        for sig in (signal.SIGTERM, signal.SIGKILL):
+            if self.wait_gone(5.0):
+                break
+            try:
+                os.kill(self.pid, sig)
+            except OSError:
+                break
+        self.pid = None
+
+    def wait_gone(self, timeout):
+        """True once the daemon's process is gone: it is not this process's child, so it is polled."""
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            try:
+                os.kill(self.pid, 0)
+            except ProcessLookupError:
+                return True
+            except OSError:
+                return False
+            time.sleep(0.05)
+        return False
+
+
+daemon = plugin_hostd_daemon()
+
+
+def worker_record(record):
+    """One record of worker_list, <worker>:<pid>:<row>:<state>:<core>:<pool>:<place>:<instance>,... with a place of
+    own or chain:<number>: (worker, row, state, place, number, members). The fields before the place have grown with
+    the daemon's versions, so the place is read from the end."""
+    fields = record.split(":")
+    if len(fields) < 5:
+        return None
+    chained = len(fields) >= 7 and fields[-3] == "chain"
+    return (fields[0], fields[2], fields[3], "chain" if chained else fields[-2], fields[-2] if chained else None,
+            [int(i) for i in fields[-1].split(",") if i.isdigit()])
+
+
+def head_client(members):
+    """{member: jack client} when the graph agrees that a worker runs these members as the one client of the first:
+    no other member has a port left. A worker that refused to run them as one keeps a client per member, which the
+    daemon may not say, and then {}: each member keeps its own, and the chain's routes connect them in order."""
+    try:
+        if any(zynautoconnect.get_ports(f"^{daemon.engines[i].jackname}:") for i in members[1:]):
+            log_once(("clients", tuple(members)), "plugin-hostd: members %s of one worker keep their own clients", members)
+            return {}
+    except Exception as e:
+        logging.debug(f"plugin-hostd client of {members} not read from the graph => {e}")
+    return {i: daemon.engines[members[0]].jackname for i in members}
+
+
+def chain_clients(chain_id):
+    """The jack client of each member the daemon's worker for this chain runs as one client, as the daemon
+    says it: chain_get names the worker and the members it runs, worker_list the row of that worker.
+    {} when the worker is not up, runs another row, or the daemon cannot say; a member it does not run
+    (quarantined) keeps a client of its own."""
+    try:
+        worker, running = daemon.call(f"chain_get {chain_id}")[1].split()[0:3:2]
+        records = daemon.call("worker_list")[1].split()
+    except (OSError, ValueError, *FAILURES) as e:
+        logging.debug(f"plugin-hostd chain {chain_id} read back => {e}")
+        return {}
+    for record in filter(None, map(worker_record, records)):
+        if record[0] == worker and record[3] == "chain" and record[4] == str(chain_id):
+            if record[1] not in ONE_CLIENT_ROWS or record[2] != "up":
+                return {}
+            members = [int(i) for i in running.split(",") if i.isdigit()]
+            if members and all(i in daemon.engines for i in members):
+                return head_client(members)
+    return {}
+
+
+class member_info:
+    """What signal_steps needs of a member beyond its value. notes: the plugin takes notes, and heads its run, since a
+    worker's one client reads MIDI for the run's head only (omx-clap-core docs/chain.md: notes to a member go through
+    its ring, not through JACK, and Zynthian routes a chain's MIDI to each processor's client). widths: its main audio
+    input and output channels, None when not known: a worker runs a chain only of members whose input and output are
+    as wide as the head's output (omx-clap-core's chain library refuses any other, OMX_CLAP_CHAIN_ERR_WIDTH), so a run
+    ends where the width changes, a stereo effect after a mono one; a mono effect after a stereo one joins it only with
+    a worker that runs it (mono_in_stereo)."""
+    __slots__ = ("value", "notes", "widths")
+
+    def __init__(self, value, notes=False, widths=None):
+        self.value, self.notes, self.widths = value, notes, widths
+
+
+def unwrap(member):
+    return member.value if isinstance(member, member_info) else member
+
+
+MONO_IN_STEREO = (0, 26, 1)  # the omx-clap-host that runs it, for a worker that declares nothing
+mono_in_stereo_cache = {}  # worker binary => whether it does
+
+
+def worker_says(worker, option):
+    """What the worker prints for an option, "" when it does not answer it."""
+    try:
+        out = subprocess.run([worker, option], capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    return out.stdout if out.returncode == 0 else ""
+
+
+def mono_in_stereo(worker="omx-clap-host"):
+    """Detect once whether the installed worker runs a member of 1 channel in and out inside a stereo chain, its input
+    the sum of both channels and its output given to both, the way zynautoconnect wires a mono
+    plugin between stereo ones. The worker's --capabilities says it; a worker whose --help lists no such option is
+    judged by its version. An older worker refuses that chain (OMX_CLAP_CHAIN_ERR_WIDTH)."""
+    if worker not in mono_in_stereo_cache:
+        # an omx-clap-host older than the option warns, says 0 and starts a host: asked only when --help lists it
+        declared = worker_says(worker, "--capabilities") if "--capabilities" in worker_says(worker, "--help") else ""
+        if declared:
+            mono_in_stereo_cache[worker] = "mono_in_stereo" in declared.split()
+        else:
+            found = re.search(r"(\d+)\.(\d+)\.(\d+)", worker_says(worker, "--version"))
+            mono_in_stereo_cache[worker] = bool(found) and tuple(int(n) for n in found.groups()) >= MONO_IN_STEREO
+    return mono_in_stereo_cache[worker]
+
+
+def joins(run, member):
+    """Whether a member may join the run in hand: it takes no notes, and its widths match the head's output, or it is
+    mono under a stereo head and the worker runs that (mono_in_stereo)."""
+    if not isinstance(member, member_info):
+        return True
+    if member.notes:
+        return False
+    head = run[0] if run else None
+    if member.widths is None or not isinstance(head, member_info) or head.widths is None:
+        return True
+    if member.widths[0] == member.widths[1] == head.widths[1]:
+        return True
+    return member.widths == (1, 1) and head.widths[1] == 2 and mono_in_stereo()
+
+
+def signal_steps(slots):
+    """The chain's plugin-hostd members in signal order, as the steps a signal takes. A slot is a list of members, None
+    for a processor of something else. A step is a tuple of parallel branches, a branch a tuple of members in series.
+    A slot of one member extends the run in hand, since a worker runs a chain in series in one JACK client; a slot of
+    several is parallel, so each of its members is a branch alone; any slot that holds something else ends the run,
+    since the signal has to go through that processor (the mixer strip, a jalv plugin) on its way to the next member."""
+    steps, run = [], []
+    for slot in slots:
+        if len(slot) == 1 and slot[0] is not None:
+            if run and not joins(run, slot[0]):  # it takes notes, or its width changes: it heads a run of its own
+                steps.append(tuple([tuple(unwrap(m) for m in run)]))
+                run = []
+            run.append(slot[0])
+            continue
+        if run:
+            steps.append(tuple([tuple(unwrap(m) for m in run)]))
+            run = []
+        branches = tuple((unwrap(member),) for member in slot if member is not None)
+        if branches:
+            steps.append(branches)
+    if run:
+        steps.append(tuple([tuple(unwrap(m) for m in run)]))
+    return steps
+
+
+def audio_path_slots(chain):
+    """The slots a chain's signal goes through: the chain's graph takes its source from the last synth slot."""
+    return chain.synth_slots[-1:] + chain.audio_slots
+
+
+def member_of(p, value):
+    """What signal_steps is given for a processor: None for one of another engine, else the value with what decides
+    the runs it may join (member_info). A plugin below our bar keeps its worker of its own: it joins no run."""
+    if not isinstance(p.engine, zynthian_engine_plugin_hostd) or value is None or p.engine.placement == "own":
+        return None
+    return member_info(value, p.engine.takes_notes(), p.engine.main_widths())
+
+
+def chain_steps(chain):
+    """signal_steps of a zynthian chain, of the plugin refs of its plugin-hostd members."""
+    return signal_steps([[member_of(p, getattr(p.engine, "plugin_uri", None)) for p in slot]
+                         for slot in audio_path_slots(chain)])
+
+
+def menu_refs(chain, eng_code, info, replacing=None):
+    """The steps to ask the estimate for while a row of the plugin menu is highlighted: the chain's with the row's
+    plugin in the place the chain options give it, in the slot of the processor being replaced, else before the mixer
+    strip for an effect, and first for anything else; [] for a row the daemon does not run, or when it has no ref."""
+    if eng_code.split("/")[0] != "PH" or not info.get("URL"):
+        return []
+    slots = [[info["URL"] if p is replacing else p.engine.plugin_uri if isinstance(p.engine, zynthian_engine_plugin_hostd)
+              else None for p in slot] for slot in (audio_path_slots(chain) if chain else ())]
+    if replacing is None or not any(info["URL"] in slot for slot in slots):
+        at = 0
+        if info.get("TYPE") == "Audio Effect":
+            strips = [i for i, slot in enumerate(audio_path_slots(chain) if chain else ())
+                      if slot and slot[0].eng_code in ("MI", "MR")]
+            at = strips[0] if strips else len(slots)
+        slots.insert(at, [info["URL"]])
+    return signal_steps(slots)
+
+
+def estimate(rate, quantum, refs):
+    """The daemon's figures for a chain of these plugin refs at this rate and quantum, from its qualification
+    records: plugin_hostd_estimate.parse's dict. estimate_unavailable once the daemon has refused the verb as
+    mod-host does, and for the rest of the session, so it is not asked again; a refusal of the question itself
+    (a plugin it does not know) is a plugin_hostd_error, and no figure."""
+    if daemon.estimate_verb is False:
+        raise zynthian_plugin_hostd_estimate.estimate_unavailable()
+    try:
+        reply = daemon.call(f"estimate {rate} {quantum} {' '.join(uri_word(r) for r in refs)}")[1]
+    except plugin_hostd_error as e:
+        if e.code == protocol.code("ERR_INVALID_OPERATION"):
+            daemon.estimate_verb = False
+            logging.warning("plugin-hostd does not answer estimate: no chain figures this session")
+            raise zynthian_plugin_hostd_estimate.estimate_unavailable()
+        raise
+    daemon.estimate_verb = True
+    return zynthian_plugin_hostd_estimate.parse(reply)
+
+
+def estimate_steps(rate, quantum, steps):
+    """The figures of a chain as signal_steps gives it, one estimate for each branch: a branch is what one worker
+    runs. Latency adds along the steps, and a step takes its longest branch; everything else adds up. A member the
+    records lack is named by its place among all of them. plugin_hostd_estimate.parse's dict."""
+    total = {"latency": 0, "cpu": 0.0, "ram": 0, "workers": 0, "unknown": 0, "members": {}}
+    place = 0
+    for step in steps:
+        longest = 0
+        for branch in step:
+            est = estimate(rate, quantum, branch)
+            longest = max(longest, est["latency"])
+            total["cpu"] += est["cpu"]
+            total["ram"] = None if total["ram"] is None or est["ram"] is None else total["ram"] + est["ram"]
+            total["workers"] += est["workers"]
+            total["unknown"] += est["unknown"]
+            total["members"].update({place + i: code for i, code in est["members"].items()})
+            place += len(branch)
+        total["latency"] += longest
+    return total
+
+
+def audio_format(state_manager):
+    """(rate, quantum) of the audio device, None when it does not say integers."""
+    try:
+        rate, quantum = state_manager.get_jackd_samplerate(), state_manager.get_jackd_blocksize()
+    except Exception:
+        return None
+    return (rate, quantum) if isinstance(rate, int) and isinstance(quantum, int) else None
+
+
+def figure_chain(chain, state_manager):
+    """Ask, off the caller's thread, for the figures of the chain as it is: they are in daemon.chain_figures
+    when the answer is there. The chain view shows them."""
+    steps, fmt = chain_steps(chain), audio_format(state_manager)
+    if not steps or fmt is None or daemon.estimate_verb is False:
+        daemon.chain_figures.pop(chain.chain_id, None)
+        return
+    if daemon.chain_figures.get(chain.chain_id, (None,))[0:3] == (steps, *fmt):
+        return
+
+    def ask():
+        try:
+            text = zynthian_plugin_hostd_estimate.footer(estimate_steps(fmt[0], fmt[1], steps))
+        except Exception as e:
+            logging.debug(f"plugin-hostd estimate of chain {chain.chain_id} => {e}")
+            return
+        if chain_steps(chain) == steps:  # the chain has not moved on since the question
+            daemon.chain_figures[chain.chain_id] = (steps, fmt[0], fmt[1], text)
+    threading.Thread(target=ask, daemon=True).start()
+
+
+def busy(chain):
+    """Whether a busy section of the state manager is running (a snapshot load, an add, a removal): the runs are then
+    declared once, when it ends (flush_pending)."""
+    for slot in chain.synth_slots + chain.audio_slots:
+        for p in slot:
+            if isinstance(p.engine, zynthian_engine_plugin_hostd):
+                return getattr(p.engine.state_manager, "is_busy", lambda: False)() is True
+    return False
+
+
+def sync_chain(chain):
+    """Run each serial run of the plugin-hostd members of a zynthian chain in one worker, in signal order, then give
+    each processor the jack client it has now: its run's for the members a worker runs as one client, the client of
+    its instance for every other.
+    Called from the chain's graph rebuild, so after insert, remove, swap and nudge. Inside a busy section the daemon is
+    not asked: the chain waits for its end (flush_pending), so a snapshot load or an edit of several steps declares
+    each run once, and a removed member is gone from the daemon before its run is declared without it (else its
+    worker would be spawned for it alone, just to be removed)."""
+    if busy(chain):
+        daemon.pending[chain.chain_id] = chain
+    else:
+        daemon.pending.pop(chain.chain_id, None)
+        declare_chain(chain)
+        daemon.synced[chain.chain_id] = chain
+        ensure_watch()
+    apply_clients(chain)
+
+
+def apply_clients(chain):
+    """Give each plugin-hostd processor of the chain its jack client; True when one of them changed."""
+    clients = {}
+    for number in daemon.runs.get(chain.chain_id, ()):
+        clients.update(daemon.clients.get(number, {}))
+    engines, changed = [], False
+    for slot in chain.synth_slots + chain.audio_slots:
+        for p in slot:
+            if isinstance(p.engine, zynthian_engine_plugin_hostd) and p.engine.instance is not None:
+                jackname = clients.get(p.engine.instance, p.engine.jackname)
+                changed |= p.jackname != jackname
+                p.jackname = jackname
+                engines.append(p.engine)
+    if engines:
+        figure_chain(chain, engines[0].state_manager)
+    else:
+        daemon.chain_figures.pop(chain.chain_id, None)
+    return changed
+
+
+def flush_pending(state=None, **kw):
+    """The end of a busy section (zynsigman SS_BUSY, state False): declare the chains that waited, and rebuild the
+    graph of every one whose clients changed so that its routes and autoconnect follow."""
+    if state is not False or not daemon.pending:
+        return
+    chains, daemon.pending = list(daemon.pending.values()), {}
+    rebuilt = False
+    for chain in chains:
+        declare_chain(chain)
+        daemon.synced[chain.chain_id] = chain
+        if apply_clients(chain):
+            chain.rebuild_audio_graph()
+            rebuilt = True
+    ensure_watch()
+    if rebuilt:
+        zynautoconnect.request_audio_connect(True)
+        zynautoconnect.request_midi_connect(True)
+
+
+zynsigman.register(zynsigman.S_STATE_MAN, zynsigman.SS_BUSY, flush_pending)
+
+
+def ensure_watch():
+    if daemon.runs and (daemon.watch is None or not daemon.watch.is_alive()):
+        daemon.watch = threading.Thread(target=watch_workers, name="plugin-hostd watch", daemon=True)
+        daemon.watch.start()
+
+
+def watch_workers():
+    """Read the grouped workers back while there are any (follow_daemon), every WATCH_S."""
+    watched = daemon
+    while watched is daemon and watched.runs:
+        time.sleep(WATCH_S)
+        if watched is daemon:
+            follow_daemon()
+
+
+def follow_daemon():
+    """A member the daemon quarantined after a crash, or a run it planned again by itself, leaves the clients Zynthian
+    routes by out of date: the chain's graph is rebuilt, so that a member that runs in a worker of its own is routed
+    through its own client again."""
+    for chain_id, chain in list(daemon.synced.items()):
+        if chain_id in daemon.pending or chain_id not in daemon.runs:
+            continue
+        try:
+            now = {number: read_clients(number) for number in daemon.runs[chain_id]}
+        except Exception as e:
+            logging.debug(f"plugin-hostd watch of chain {chain_id} => {e}")
+            continue
+        if all(now[number] == daemon.clients.get(number, {}) for number in now):
+            continue
+        logging.info("plugin-hostd moved members of chain %s: its routes follow", chain_id)
+        daemon.clients.update(now)
+        if apply_clients(chain):
+            chain.rebuild_audio_graph()
+            zynautoconnect.request_audio_connect(True)
+
+
+def read_clients(number):
+    """The clients of a run as the daemon and the graph say they are now: a plan's segments, or a declared chain."""
+    if number in daemon.plans:
+        try:
+            segments = parse_segments(daemon.call(f"plan_get {number}")[1])
+        except (OSError, ValueError, *FAILURES):
+            return daemon.clients.get(number, {})
+        return segment_clients(number, segments)
+    if number in daemon.chains:
+        return chain_clients(number)
+    return {}
+
+
+def serial_runs(chain):
+    """The runs of two or more plugin-hostd instances of a zynthian chain that may share a worker, each in signal
+    order: signal_steps says which. A member of a parallel slot, or one with nothing in series beside it, is in none
+    and has a worker of its own."""
+    steps = signal_steps([[member_of(p, getattr(p.engine, "instance", None)) for p in slot]
+                          for slot in audio_path_slots(chain)])
+    return [branch for step in steps for branch in step if len(branch) > 1]
+
+
+def run_number(chain_id, k):
+    """The number the daemon knows run k of a zynthian chain by: the chain's own for the first, and above every chain
+    id for the others (a chain id fits a byte, chain_manager's MIDI learn table packs it in one)."""
+    return chain_id if k == 0 else (chain_id + 1) * RUN_NUMBERS + k
+
+
+def declare_chain(chain):
+    """Hand each serial run of the chain to the daemon. A number whose members now belong to another run is cleared
+    first: the daemon refuses a member that another chain holds."""
+    chain_id = chain.chain_id
+    wanted = stable_numbers(chain_id, serial_runs(chain), daemon.runs.get(chain_id, {}))
+    for number, members in daemon.runs.get(chain_id, {}).items():
+        if number not in wanted or any(set(members) & set(other) for n, other in wanted.items() if n != number):
+            declare_run(number, ())
+    for number, members in wanted.items():
+        declare_run(number, members)
+    if wanted:
+        daemon.runs[chain_id] = wanted
+    else:
+        daemon.runs.pop(chain_id, None)
+
+
+def stable_numbers(chain_id, runs, before):
+    """{number: members} for the chain's runs: a run keeps the number of the run it shares most members with, so an
+    edit elsewhere in the chain leaves its worker alone; a run that shares none takes the lowest free number."""
+    wanted, left = {}, []
+    for members in runs:
+        best = max((n for n in before if n not in wanted and set(before[n]) & set(members)),
+                   key=lambda n: len(set(before[n]) & set(members)), default=None)
+        if best is None:
+            left.append(members)
+        else:
+            wanted[best] = members
+    k = 0
+    for members in left:
+        while run_number(chain_id, k) in wanted or run_number(chain_id, k) in before:
+            k += 1
+        wanted[run_number(chain_id, k)] = members
+    return wanted
+
+
+def declare_run(number, members):
+    """Hand a run's members to the daemon: to its planner, which decides what runs together, or, for a
+    daemon that has no plan verb or has grouping off, as one chain, the way plugin-hostd 0.12 took them."""
+    if daemon.plan_verbs is not False and daemon.grouping is not False:
+        if plan_chain(number, members):
+            return
+    if daemon.plan_verbs is False:
+        # a daemon with no planner (plugin-hostd 0.12) has no grouping setting either: chain is its only way
+        declare_whole_chain(number, members)
+        return
+    # the daemon has grouping off: nothing runs together, and a run declared before (a daemon restarted with the
+    # setting changed comes back through restore, which forgets them) is let go
+    declare_whole_chain(number, ())
+
+
+def declare_whole_chain(chain_id, members):
+    if not members:
+        daemon.chain_refused.pop(chain_id, None)
+        daemon.asked_at.pop(chain_id, None)
+    if daemon.chains.get(chain_id, ()) == members:
+        return
+    if daemon.chain_refused.get(chain_id) == members and not due(chain_id):
+        return
+    try:
+        if members:
+            daemon.call(f"chain {chain_id} {' '.join(map(str, members))}", SLOW_TIMEOUT)
+            daemon.chains[chain_id] = members
+            daemon.chain_refused.pop(chain_id, None)
+            daemon.clients[chain_id] = chain_clients(chain_id)
+            return
+    except plugin_hostd_error as e:
+        if e.code not in CHAIN_FALLBACK_CODES:
+            logging.error(f"plugin-hostd chain {chain_id} => {e}")
+            return
+        log_once(("chain", chain_id), "plugin-hostd runs chain %s in separate workers: %s", chain_id, e.name)
+        daemon.chain_refused[chain_id] = members
+        daemon.asked_at[chain_id] = time.monotonic()
+    except (plugin_hostd_down, plugin_hostd_timeout) as e:
+        logging.error(f"plugin-hostd chain {chain_id} => {e}")
+        return
+    daemon.clients.pop(chain_id, None)
+    if daemon.chains.pop(chain_id, None):
+        try:
+            daemon.call(f"chain_clear {chain_id}")
+        except (OSError, *FAILURES) as e:
+            logging.debug(f"plugin-hostd chain_clear {chain_id} => {e}")
+
+
+def due(number):
+    """Whether a run that was refused, or planned alone for a reason that can change, is to be asked again."""
+    asked = daemon.asked_at.get(number)
+    return asked is not None and time.monotonic() - asked >= RETRY_S
+
+
+# ---- The plan: the daemon says which of the members run together ----
+
+def parse_segments(text):
+    """'1,2;3;4,5' => [[1, 2], [3], [4, 5]]; the cores that follow the segments in a plan's reply are not read."""
+    return [[int(i) for i in segment.split(",")] for segment in text.split()[0].split(";")]
+
+
+def parse_reasons(text):
+    """'3:verdict-isolated,5:plan-refused:<code>' => {3: 'verdict-isolated', 5: 'plan-refused:<code>'}; '-' is none.
+    The instance ends at the first colon: a reason may hold more of them."""
+    reasons = {}
+    if text and text != "-":
+        for item in text.split(","):
+            instance, _, reason = item.partition(":")
+            if instance.isdigit() and reason:
+                reasons.setdefault(int(instance), reason)
+    return reasons
+
+
+def plan_answered():
+    """False when the daemon does not know the plan verbs, asked with a read that a daemon which has
+    them answers: plan_get of a chain nobody planned is the daemon's no-such-plan refusal, a daemon without them
+    refuses the verb as mod-host does."""
+    try:
+        daemon.call("plan_get 0")
+    except plugin_hostd_error as e:
+        return e.code != protocol.code("ERR_INVALID_OPERATION")
+    except (OSError, plugin_hostd_down, plugin_hostd_timeout):
+        return True
+    return True
+
+
+def forget_plan(chain_id):
+    """Every member of the chain back in a worker of its own, and nothing left of what was said of it."""
+    for instance in daemon.plans.pop(chain_id, ()):
+        daemon.reasons.pop(instance, None)
+    daemon.clients.pop(chain_id, None)
+
+
+def clear_plan(chain_id):
+    try:
+        daemon.call(f"plan_clear {chain_id}")
+    except (OSError, *FAILURES) as e:
+        logging.debug(f"plugin-hostd plan_clear {chain_id} => {e}")
+
+
+def segment_clients(chain_id, segments):
+    """{member: jack client} for the members of the segments whose worker is one client: worker_list names the
+    worker of segment k as place chain:<chain>.<k> and its row; the head of the members it runs gives the client.
+    A member that has a worker of its own (quarantined out of its segment) keeps its own."""
+    try:
+        records = daemon.call("worker_list")[1].split()
+    except (OSError, *FAILURES) as e:
+        logging.debug(f"plugin-hostd chain {chain_id} read back => {e}")
+        return {}
+    workers = list(filter(None, map(worker_record, records)))
+    alone = {i for w in workers if w[3] == "own" for i in w[5]}
+    clients = {}
+    for _, row, state, place, number, members in workers:
+        if place != "chain" or row not in ONE_CLIENT_ROWS or state != "up":
+            continue
+        owner, _, k = number.partition(".")
+        if owner != str(chain_id) or not k.isdigit() or int(k) >= len(segments):
+            continue
+        running = [i for i in members if i not in alone]
+        if running and all(i in daemon.engines for i in running):
+            clients.update(head_client(running))
+    return clients
+
+
+def plan_chain(chain_id, members):
+    """Plan the chain. False when the daemon cannot plan (no plan verb, or grouping off), and the chain is
+    then declared whole; True when the plan is the daemon's answer and has been taken."""
+    if members == daemon.plans.get(chain_id, ()) and not due(chain_id):
+        return True
+    if not members:
+        daemon.asked_at.pop(chain_id, None)
+        if chain_id in daemon.plans:
+            clear_plan(chain_id)
+        forget_plan(chain_id)
+        return True
+    if daemon.chains.get(chain_id):  # a chain of the same number the controller declared before
+        declare_whole_chain(chain_id, ())
+    try:
+        segments = parse_segments(daemon.call(f"plan {chain_id} {' '.join(map(str, members))}", SLOW_TIMEOUT)[1])
+    except plugin_hostd_error as e:
+        if e.code == protocol.code("ERR_INVALID_OPERATION") and not plan_answered():
+            daemon.plan_verbs = False
+            logging.warning("plugin-hostd does not answer plan: chain %s runs as one chain, as plugin-hostd 0.12 does",
+                            chain_id)
+            return False
+        return plan_refused(chain_id, members, e)
+    except (plugin_hostd_down, plugin_hostd_timeout, ValueError) as e:
+        logging.error(f"plugin-hostd plan {chain_id} => {e}")
+        return True
+    daemon.plan_verbs = True
+    try:
+        # <segments> <reasons> <cores>
+        reasons = parse_reasons((daemon.call(f"plan_get {chain_id}")[1].split() + [""])[1])
+    except (OSError, ValueError, *FAILURES) as e:
+        logging.error(f"plugin-hostd plan_get {chain_id} => {e}")
+        reasons = {}
+    if "grouping-off" in reasons.values():
+        # The daemon answered the plan and moved nothing: the setting grouping is off, so the chain is
+        # declared whole, as it was before there was a plan
+        daemon.grouping = False
+        logging.info("plugin-hostd has grouping off: chain %s is declared as one chain", chain_id)
+        clear_plan(chain_id)
+        forget_plan(chain_id)
+        return False
+    if any(len(segment) > 1 for segment in segments):
+        daemon.grouping = True
+    forget_plan(chain_id)
+    daemon.plans[chain_id] = members
+    daemon.reasons.update(reasons)
+    daemon.clients[chain_id] = segment_clients(chain_id, segments)
+    if any(r.startswith(RETRY_REASONS) for r in reasons.values()):
+        daemon.asked_at[chain_id] = time.monotonic()
+    else:
+        daemon.asked_at.pop(chain_id, None)
+    return True
+
+
+def plan_refused(chain_id, members, e):
+    """The daemon refused the plan and moved nothing: a plan it had stays, so it is cleared, and every
+    member runs alone with the refusal as its reason."""
+    if chain_id in daemon.plans:
+        clear_plan(chain_id)
+    forget_plan(chain_id)
+    logging.warning("plugin-hostd plan %s => %s: every member runs alone", chain_id, e.name)
+    daemon.plans[chain_id] = members
+    daemon.reasons.update({i: f"plan-refused:{e.code}" for i in members})
+    daemon.asked_at[chain_id] = time.monotonic()
+    return True
+
+
+# ---- Controller pages from omx-panel's layout of the plugin's descriptor ----
+
+SURFACE_WIDTH = 4  # the controls a Zynthian screen shows, one per encoder: the one declaration of the page width here
+
+layout_cache = {}  # (descriptor path, mtime, width, remote) => (pages, the description's controls by symbol)
+description_cache = {}  # (descriptor path, mtime) => the description panel_layout read
+
+
+def symbol_of(param):
+    """omx-panel's name for a parameter id: a CLAP parameter's number is p<number>, an LV2 port keeps its symbol."""
+    return param if isinstance(param, str) else f"p{param}"
+
+
+def panel_layout(path, width=None, remote=None):
+    """omx-panel's cut of the plugin's descriptor into pages of `width` slots (the Zynthian screen's, unless a surface
+    names its own): `describe --pages --per-page <width>`, the skin applied, the Easy controls first, the groups kept
+    whole, a hidden control's slot left blank (None). The host's remote-controls pages, when it has them, are handed
+    over as `--remote`. Returns (pages, {symbol: the description's control}), or None with the reason logged."""
+    width = width or SURFACE_WIDTH
+    try:
+        key = (path, os.stat(path).st_mtime, width, json.dumps(remote))
+    except OSError:
+        return None
+    if key in layout_cache:
+        return layout_cache[key]
+    panel = shutil.which("omx-panel")
+    if not panel:
+        log_once("omx-panel", "omx-panel is not installed: plugin-hostd has no controller pages")
+        return None
+    remote_file = None
+    try:
+        extra = []
+        if remote:
+            with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
+                json.dump(remote, f)
+                remote_file = f.name
+            extra = ["--remote", remote_file]
+
+        def run(*args):
+            cmd = [panel, "describe", "--descriptor", path, *args]
+            return json.loads(subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=30).stdout)
+
+        pages = run("--pages", "--per-page", str(width), *extra)
+        description = run()["description"]
+        controls = description.get("controls", [])
+        description_cache[(path, key[1])] = description
+    except (OSError, ValueError, KeyError, subprocess.SubprocessError) as e:
+        log_once(("omx-panel", path), "omx-panel describe of %s failed (%s): plugin-hostd has no controller pages", path, e)
+        return None
+    finally:
+        if remote_file:
+            os.unlink(remote_file)
+    layout_cache[key] = (pages, {str(c["symbol"]): c for c in controls})
+    return layout_cache[key]
+
+
+drawn_cache = {}  # (descriptor path, mtime) => (the layout the renderer draws, the description), or None
+
+
+def panel_drawn(path):
+    """What the panel's own screen draws with omx-panel's renderer: (layout, description), the layout from
+    `describe --layout` (the derivation's, its displays included) and the description its curve terms are bound by.
+    None, said once, when omx-panel cannot give them (not installed, or one with no --layout)."""
+    try:
+        key = (path, os.stat(path).st_mtime)
+    except OSError:
+        return None
+    if key in drawn_cache:
+        return drawn_cache[key]
+    drawn_cache[key] = None
+    panel = shutil.which("omx-panel")
+    if not panel:
+        log_once("omx-panel", "omx-panel is not installed: plugin-hostd has no controller pages")
+        return None
+    try:
+        def run(*args):
+            cmd = [panel, "describe", "--descriptor", path, *args]
+            return json.loads(subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=30).stdout)
+
+        layout = run("--layout")
+        description = description_cache.get(key) or run()["description"]
+        if not isinstance(description, dict) or not isinstance(layout, dict) or "description" in layout \
+                or not isinstance(layout.get("sections"), list):
+            raise ValueError("this omx-panel prints no layout for describe --layout")
+    except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as e:
+        log_once(("omx-panel layout", path), "omx-panel describe --layout of %s failed (%s): the panel has no drawn view",
+                 path, e)
+        return None
+    drawn_cache[key] = (layout, description)
+    return drawn_cache[key]
+
+
+probe_cache = {}  # plugin uri => the descriptor file plugin-hostd-probe describe wrote, None when it refused
+
+
+def probe_descriptor(uri, why):
+    """The daemon has no descriptor (absent, or its scan failed): describe the plugin here, once."""
+    if uri not in probe_cache:
+        probe_cache[uri] = None
+        probe = shutil.which("plugin-hostd-probe")
+        if not probe:
+            log_once(("descriptor", uri), "plugin-hostd has no descriptor for %s (%s) and plugin-hostd-probe "
+                     "is not installed", uri, why)
+            return None
+        target = uri if uri.startswith("clap:") else f"lv2:{uri}"
+        out_dir = os.path.join(tempfile.gettempdir(), "plugin-hostd-probe")
+        os.makedirs(out_dir, exist_ok=True)
+        path = os.path.join(out_dir, re.sub(r"[^A-Za-z0-9._-]+", "_", uri) + ".json")
+        try:
+            done = subprocess.run([probe, "describe", target], capture_output=True, timeout=PROBE_TIMEOUT)
+            if done.returncode == 0 and done.stdout.strip():
+                with open(path, "wb") as f:
+                    f.write(done.stdout)
+                probe_cache[uri] = path
+        except (OSError, subprocess.SubprocessError) as e:
+            logging.warning("plugin-hostd-probe describe %s failed (%s)", target, e)
+        if not probe_cache[uri]:
+            log_once(("descriptor", uri), "plugin-hostd has no descriptor for %s (%s) and the probe made none",
+                     uri, why)
+    return probe_cache[uri]
+
+
+# ---- The engine: one per processor, its plugin one instance of the shared daemon ----
+
+class zynthian_engine_plugin_hostd(zynthian_engine):
+
+    def __init__(self, eng_code, state_manager=None):
+        super().__init__(state_manager)
+        self.eng_info = self.chain_manager.engine_info[eng_code]
+        self.type = self.eng_info["TYPE"]
+        self.name = self.plugin_name = self.eng_info["NAME"]
+        self.nickname = eng_code
+        self.plugin_uri = self.eng_info["URL"]
+        self.instance = None
+        self.placement = None  # own when the plugin is below our bar and runs in a worker of its own
+        self.notes = None  # whether the plugin takes notes, see takes_notes
+        self.widths = False  # its main input and output channels, see main_widths; False until asked
+        self.preset_key = None
+        self.pending_state = None
+        self.compare_doc = None  # the slots, rides the snapshot; see Compare below
+        self.compare_ring = None  # the undo steps; as the console's journal, not saved
+        self.compare_queue = []  # values to come back to, handed to omx-panel at the next step
+        self.compare_settled = {}
+        self.compare_last_move = 0.0
+        self.compare_moving = False
+        self.bypass_zctrl = None
+        self.zctrls = {}
+        self.path_zctrls = {}  # symbol => the controller of a plugin's file property (a sample, a kit, an SFZ), see Files below
+        self.path_uris = {}  # symbol => the URI of that patch property, from the plugin's TTL
+        self.labels = {}
+        self._ctrls = []
+        self._ctrl_screens = []
+        self.screen_pages = []
+        self.drawn = None  # (layout, description) of the panel's drawn view, see panel_drawn
+        self.curves_bound = {}  # display index => the curve_bind line the daemon holds for it
+        self.monitored = {}  # meter symbol => the feedback connection its monitor_output was set on
+        self.options['ctrl_fb'] = False
+
+    def add_processor(self, processor):
+        if self.instance is None:
+            self.placement = self.below_bar_placement()
+            self.instance = daemon.add(self, self.plugin_uri, self.placement)
+            self.jackname = f"effect_{self.instance}"
+            self.zctrls = self.build_controllers()
+            self.compare_settled = self.compare_values()
+            self.generate_ctrl_screens(self.zctrls)
+            self.path_zctrls = self.build_path_controllers()
+            self.generate_ctrl_screens(self.path_zctrls)
+            self.set_drawn_view()
+            if self.pending_state:
+                self.load_state(self.pending_state)
+                self.pending_state = None
+        if processor not in self.processors:
+            self.processors.append(processor)
+        # a save always goes to User: the save screen asks for no bank
+        processor.auto_save_bank = True
+        processor.jackname = self.jackname
+        self.set_midi_chan(processor)
+        processor.refresh_controllers()
+
+    def below_bar_placement(self):
+        """own for a plugin below our bar (its pin refused, a crash or a hang in qualification, an RT-safety fault),
+        after telling the daemon a refused one is the user's choice; None for the rest. It runs in plugin-hostd
+        either way: no plugin is handed to another host."""
+        try:
+            facts = qualification.refresh().facts(self.plugin_uri, None)
+        except Exception as e:
+            logging.warning(f"Can't read the qualification of {self.plugin_uri} => {e}")
+            return None
+        reason = zynthian_plugin_tiers.place(facts).reason
+        if reason == "refused":
+            if zynthian_plugin_tiers.plugin_bar() != "qualified-only":
+                daemon.accept_below_bar(self.plugin_uri)
+            else:
+                # qualified-only is the user saying no to plugins below the bar: the pin is refused again and the add says why
+                daemon.revoke_below_bar(self.plugin_uri)
+        return "own" if reason in ISOLATE_REASONS or facts.rt_safe is False else None
+
+    def main_widths(self):
+        """(main input channels, main output channels) from the plugin's scanned descriptor, asked once; None when
+        the daemon has no descriptor for it, or it does not say: then nothing is split on its width."""
+        if self.widths is False:
+            self.widths = None
+            try:
+                path = daemon.call(f"descriptor_get {uri_word(self.plugin_uri)}")[1].strip().strip('"')
+                with open(path) as f:
+                    ports = json.load(f).get("ports", [])
+                width = {p.get("direction"): p.get("channels") for p in ports if p.get("role") == "main"}
+                if isinstance(width.get("in"), int) and isinstance(width.get("out"), int):
+                    self.widths = (width["in"], width["out"])
+            except (OSError, ValueError, AttributeError, *FAILURES):
+                pass
+        return self.widths
+
+    def takes_notes(self):
+        """Whether the plugin takes notes, as the daemon's note_input answers it (midi_in, or - for none), asked once.
+        A daemon that does not answer it leaves every plugin free to join a run: the synth heads its run anyway."""
+        if self.notes is None and self.instance is not None:
+            try:
+                self.notes = daemon.call(f"note_input {self.instance}")[1].strip() not in ("", "-")
+            except (OSError, *FAILURES):
+                self.notes = False
+        return bool(self.notes)
+
+    def grouping_reason(self):
+        """The reason word the daemon's plan gave for this plugin, None when it has none."""
+        return daemon.reasons.get(self.instance)
+
+    def grouping_text(self):
+        """What the plugin's entry says of why it is not grouped with its neighbours, None when nothing."""
+        reason = self.grouping_reason()
+        return zynthian_plugin_hostd_grouping.text(reason, protocol.name) if reason else None
+
+    def remove_processor(self, processor):
+        # The instance stays until stop: a processor moved to another chain keeps its plugin
+        if processor in self.processors:
+            self.processors.remove(processor)
+        processor.jackname = None
+
+    def stop(self):
+        if self.instance is not None:
+            daemon.remove(self.instance)
+            self.instance = None
+        self.curves_bound = {}
+        self.monitored = {}
+
+    # ---- The drawn view: the bars, curves and meters of the panel, drawn by omx-panel's renderer ----
+
+    def set_drawn_view(self):
+        """The panel's own screen (zynthian_widget_omx_panel) for a plugin whose panel has a bar group, a curve or a
+        meter, for CLAP and LV2 alike: what the plain controller screens cannot show. Any other keeps them alone."""
+        path = self.descriptor_path()
+        self.drawn = panel_drawn(path) if path else None
+        if self.drawn and panel_view.drawn_parts(self.drawn[0]):
+            self.custom_gui_fpath = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "zyngui",
+                                                 "zynthian_widget_omx_panel.py")
+        else:
+            self.custom_gui_fpath = None
+
+    def curve(self, display):
+        """The points of display `display` of the description, as plugin-hostd computes them from the plugin's values
+        now (curve_bind once, then curve_points); [] when it draws none (its reply says why, logged once)."""
+        if not self.drawn or self.instance is None:
+            return []
+        description = self.drawn[1]
+        line = panel_view.curve_bind_line(self.instance, display, description)
+        if not line:
+            return []
+        for attempt in (0, 1):
+            try:
+                if self.curves_bound.get(display) != line:
+                    daemon.call(line)
+                    self.curves_bound[display] = line
+                return panel_view.curve_points(daemon.call(f"curve_points {self.instance} {display} 96")[1])
+            except plugin_hostd_error as e:
+                # a respawned instance lost its binding: bind again, once
+                self.curves_bound.pop(display, None)
+                if attempt or e.code != protocol.codes.get("CURVE_TERM_MISSING"):
+                    log_once(("curve", self.plugin_uri, display), "plugin-hostd draws no curve %s for %s: %s", display,
+                             self.plugin_uri, e)
+                    return []
+            except (OSError, plugin_hostd_down, plugin_hostd_timeout) as e:
+                log_once(("curve", self.plugin_uri, display), "plugin-hostd draws no curve %s for %s: %s", display,
+                         self.plugin_uri, e)
+                return []
+        return []
+
+    def meter(self, symbol):
+        """The last reading of output `symbol` (a meter) from the feedback port, None until one came. The monitor is
+        asked once per feedback connection."""
+        if self.instance is None:
+            return None
+        fb = daemon.client.feedback
+        if fb.sock is not None and self.monitored.get(symbol) != fb.generation:
+            self.monitored[symbol] = fb.generation
+            try:
+                daemon.call(f"monitor_output {self.instance} {symbol}")
+            except (OSError, *FAILURES) as e:
+                log_once(("meter", self.plugin_uri, symbol), "plugin-hostd monitors no %s for %s: %s", symbol,
+                         self.plugin_uri, e)
+        return fb.values.get((self.instance, symbol))
+
+    def replay_lines(self, bulk=False):
+        """What puts the instance back in a daemon that lost it: the add, the preset, every value. bulk: the values
+        of the parameters in one param_set_many line, for a daemon of protocol 0.3."""
+        lines = [f"add {uri_word(self.plugin_uri)} {self.instance}" + (f" {self.placement}" if self.placement else "")]
+        if self.preset_key:
+            lines.append(f"preset_load {self.instance} {self.preset_key}")
+        lines += self.path_lines()
+        params = [z for z in self.zctrls.values() if z is not self.bypass_zctrl]
+        if bulk and params:
+            lines.append(f"param_set_many {self.instance} " + " ".join(f"{z.symbol} {z.value}" for z in params))
+            return lines + [self.value_line(z) for z in self.zctrls.values() if z is self.bypass_zctrl]
+        return lines + [self.value_line(zctrl) for zctrl in self.zctrls.values()]
+
+    def param_lines(self):
+        """One param_set per parameter, the way every daemon takes them."""
+        return [self.value_line(z) for z in self.zctrls.values() if z is not self.bypass_zctrl]
+
+    def read_values(self, symbols):
+        """{symbol: the daemon's text of its value, or None where it has none}: one param_get_many for a daemon of
+        protocol 0.3, a param_get per symbol for any other, and for a bulk line that is refused or answers another
+        number of values (it is all or nothing, so one symbol it lacks refuses every one)."""
+        symbols = list(symbols)
+        if symbols and daemon.bulk_ok():
+            try:
+                values = daemon.call(f"param_get_many {self.instance} {' '.join(symbols)}")[1].split()
+                if len(values) == len(symbols):
+                    return dict(zip(symbols, values))
+            except plugin_hostd_error as e:
+                daemon.bulk_refused(e)
+            except FAILURES:
+                pass
+        return {symbol: self.send_quiet(f"param_get {self.instance} {symbol}") for symbol in symbols}
+
+    def send(self, line, timeout=TIMEOUT):
+        try:
+            return daemon.call(line, timeout)
+        except FAILURES as e:
+            logging.error(f"plugin-hostd {e}")
+
+    def send_quiet(self, line):
+        """The reply of a query, None when the daemon has no answer for it (no parameter contract, no such symbol)."""
+        try:
+            return daemon.call(line)[1]
+        except FAILURES:
+            return None
+
+    # ---- The plugin's own window (CLAP gui or an LV2 UI, the user never sees which) ----
+
+    def has_window(self):
+        """True unless the descriptor says the plugin has no window of its own."""
+        path = self.descriptor_path()
+        if not path:
+            return True
+        try:
+            with open(path) as f:
+                return json.load(f).get("plugin", {}).get("gui", True) is not False
+        except (OSError, ValueError, AttributeError):
+            return True
+
+    def window_shown(self):
+        return getattr(self, "window_open", False)
+
+    def toggle_window(self):
+        """Show the plugin's window on the display, or hide it. Returns the reply text when the daemon refuses."""
+        verb = "hide_external_ui" if self.window_shown() else "show_external_ui"
+        try:
+            daemon.call(f"{verb} {self.instance}")
+        except FAILURES as e:
+            logging.error(f"plugin-hostd {e}")
+            return str(e)
+        self.window_open = verb == "show_external_ui"
+        return None
+
+    def get_name(self, processor=None):
+        return self.plugin_name
+
+    def get_path(self, processor=None):
+        return self.plugin_name
+
+    def set_midi_chan(self, processor):
+        processor.midi_chan_engine = processor.midi_chan
+
+    # ---- Controllers ----
+
+    def descriptor_path(self):
+        """The descriptor file of the plugin: the daemon's scan of it, else a describe of our own."""
+        deadline = time.monotonic() + DESCRIPTOR_WAIT
+        while True:
+            try:
+                return daemon.call(f"descriptor_get {uri_word(self.plugin_uri)}")[1].strip().strip('"')
+            except plugin_hostd_error as e:
+                if e.code == DESCRIPTOR_PENDING and time.monotonic() <= deadline:  # the add's scan still runs
+                    time.sleep(0.25)
+                    continue
+                if e.code in DESCRIPTOR_NONE:
+                    return probe_descriptor(self.plugin_uri, e.name)
+                log_once(("descriptor", self.plugin_uri), "plugin-hostd has no descriptor for %s (%s)",
+                         self.plugin_uri, e.name)
+                return None
+            except (plugin_hostd_down, plugin_hostd_timeout):
+                return None
+
+    def param_list(self, dlist):
+        """(symbol, name, meta) in the plugin's own order: its descriptor, else its CLAP scan or its LV2 ports.
+        The ports and the scan carry no scale: a stepped parameter is the descriptor's or param_info's to say."""
+        if dlist:
+            return [(str(c["id"]), c.get("label") or c.get("name"), c) for c in dlist]
+        if self.nickname in clap_plugins:
+            return [(p["id"], p["name"], {"travel": {"min": p["min"], "max": p["max"], "default": p["default"]}})
+                    for p in clap_plugins[self.nickname]["params"]]
+        try:
+            from zyngine import zynthian_lv2
+            ports = zynthian_lv2.get_plugin_ports(self.plugin_uri).values()
+        except Exception as e:
+            logging.error(f"Can't read the ports of {self.plugin_uri} => {e}")
+            return []
+        return [(p["symbol"], p["name"], {"travel": {"min": p["range"]["min"], "max": p["range"]["max"],
+                 "default": p["value"]}, "kind": "toggle" if p["is_toggled"] else "travel"})
+                for p in ports if not p.get("is_path")]
+
+    def remote_ids(self, dcontrols):
+        """The plugin's own remote-control pages (clap.remote-controls) as the host reports them, for omx-panel's cut:
+        [{"name", "ids"}], a slot a control's id or None. Empty when it has none or the daemon cannot say."""
+        if self.instance is None:
+            return []
+        try:
+            count = daemon.call(f"remote_pages {self.instance}")[0]
+        except FAILURES:
+            return []
+        result = []
+        for n in range(count):
+            try:
+                words = shlex.split(daemon.call(f"remote_page_get {self.instance} {n}")[1])
+            except (ValueError,) + FAILURES:
+                continue
+            # <page_id> <section> <page_name> then eight slots, "-" for an empty one
+            if len(words) < 3:
+                continue
+            ids = [None if w == "-" else dcontrols[w]["id"] if w in dcontrols else int(w) if w.isdigit() else w for w in words[3:]]
+            if any(i is not None for i in ids):
+                result.append({"name": words[2] or words[1], "ids": ids})
+        return result
+
+    def pages(self, width=None):
+        """[(page name, [slot])] as omx-panel cuts the plugin's description at `width` (the Zynthian screen's): every page has
+        exactly `width` slots, a slot (symbol, label, unit, descriptor control) or None where the control is hidden, read-only
+        or empty. Nothing here builds, merges, reorders or cuts a page."""
+        width = width or SURFACE_WIDTH
+        path = self.descriptor_path()
+        dcontrols, ids = {}, {}
+        if path:
+            try:
+                with open(path) as f:
+                    for c in json.load(f).get("controls", []):
+                        dcontrols[str(c["id"])] = c
+                        ids[symbol_of(c["id"])] = str(c["id"])
+            except (OSError, ValueError, KeyError) as e:
+                logging.error(f"Can't read descriptor {path} => {e}")
+        cut = panel_layout(path, width, self.remote_ids(dcontrols)) if path else None
+        if not cut:
+            return []
+        result = []
+        for page in cut[0]:
+            slots = []
+            for pid in page["ids"]:
+                key = None if pid is None else str(pid)
+                dc, lc = dcontrols.get(key, {}), cut[1].get(symbol_of(pid), {}) if pid is not None else {}
+                if key is None or lc.get("widget") in ("meter", "display") or dc.get("readonly"):
+                    slots.append(None)  # the slot stays, blank
+                else:
+                    slots.append((key, lc.get("label") or dc.get("name"), None, dc))
+            if any(slots) or all(i is None for i in page["ids"]):
+                result.append((page.get("pageName") or page.get("sectionName"), slots))
+        return result
+
+    blank_slots = True  # a screen keeps a hidden control's slot, blank (processor.build_ctrl_screen)
+
+    def generate_ctrl_screens(self, zctrl_dict):
+        """The screens are omx-panel's pages as they come: the page's name, its slots in order, a blank slot None. The base
+        cutter, which would cut by group in fours and close every gap, is not asked."""
+        if zctrl_dict is not self.zctrls:
+            return super().generate_ctrl_screens(zctrl_dict)  # the signal-path controls are no plugin page
+        names = set()
+        for name, rows in self.screen_pages:
+            while name in names:
+                name += " +"
+            names.add(name)
+            self._ctrl_screens.append([name, [slot[0] if slot and slot[0] in zctrl_dict else None for slot in rows]])
+
+    def build_controllers(self):
+        """A zctrl per control, grouped by the page that first shows it: each page of omx-panel's cut is one screen
+        (generate_ctrl_screens). Unit, scale and range come from param_info when it answers, else from the descriptor."""
+        zctrls = {}
+        pages = self.screen_pages = self.pages()
+        priority = sum(len(rows) for _, rows in pages) + 1
+        values = self.read_values(slot[0] for _, rows in pages for slot in rows if slot)
+        for k, (page_name, rows) in enumerate(pages):
+            for slot in rows:
+                if slot is None or slot[0] in zctrls:  # a blank slot; a control on a second page is the first's
+                    continue
+                symbol, label, unit, meta = slot
+                travel = meta.get("travel", {})
+                o = {"min": travel.get("min", 0.0), "max": travel.get("max", 1.0), "unit": unit or travel.get("unit"),
+                     "default": travel.get("default", meta.get("default", 0.0)), "scale": travel.get("scale", "linear")}
+                info = self.send_quiet(f"param_info {self.instance} {symbol}")
+                if info:
+                    w = info.split()
+                    o.update(unit=w[0], scale=w[1], min=float(w[2]), max=float(w[3]), default=float(w[4]))
+                value = values.get(symbol)
+                unit = o["unit"] if o["unit"] not in (None, "", "-", "unknown") else ""
+                zopts = {"name": f"{label} {unit}" if unit else label, "group_symbol": f"page{k}",
+                         "group_name": page_name, "display_priority": priority, "value_min": o["min"],
+                         "value_max": o["max"], "value_default": o["default"], "is_logarithmic": o["scale"] == "log",
+                         "is_integer": o["scale"] == "stepped"}
+                if o["scale"] in ("linear", "log") and meta.get("kind") not in ("toggle", "choice"):
+                    # the position law is the contract's; only these controllers follow it
+                    zopts["position_law"] = {"scale": o["scale"], "min": o["min"], "max": o["max"]}
+                    if travel.get("step"):
+                        # the declared step: a gesture's step is this and not a number of its own
+                        zopts["position_law"]["step"] = travel["step"]
+                if meta.get("kind") == "toggle":
+                    zopts.update(is_toggle=True, is_integer=True, value_min=0, value_max=1, labels=["off", "on"],
+                                 ticks=[0, 1], value_default=int(bool(meta.get("default"))))
+                elif meta.get("kind") == "choice" and meta.get("values"):
+                    zopts.update(labels=meta.get("labels") or meta["ids"], ticks=meta["values"], is_integer=True,
+                                 value_min=meta["values"][0], value_max=meta["values"][-1])
+                    if meta.get("default") in meta.get("ids", []):
+                        zopts["value_default"] = meta["values"][meta["ids"].index(meta["default"])]
+                zopts["value"] = float(value) if value else zopts["value_default"]
+                zctrls[symbol] = zynthian_controller(self, symbol, zopts)
+                self.labels[symbol] = label
+                priority -= 1
+        if self.type == "Audio Effect":
+            self.bypass_zctrl = zctrls["bypass"] = zynthian_controller(self, "bypass", {
+                "name": "bypass", "is_toggle": True, "is_bypass": True, "bypass_value": 1, "value_max": 1,
+                "value_default": 0, "value": 0, "labels": ["inline", "bypass"], "ticks": [0, 1],
+                "display_priority": 0, "not_on_gui": True})
+        return zctrls
+
+    def get_controllers_dict(self, processor):
+        zctrls = super().get_controllers_dict(processor)
+        for zctrl in self.zctrls.values():
+            zctrl.set_options({"processor": processor})
+        zctrls.update(self.zctrls)
+        zctrls.update(self.path_zctrls)
+        return zctrls
+
+    def value_line(self, zctrl):
+        if zctrl.is_path:
+            return self.path_line(zctrl)
+        if zctrl is self.bypass_zctrl:
+            return f"bypass {self.instance} {int(zctrl.value)}"
+        return f"param_set {self.instance} {zctrl.symbol} {zctrl.value}"
+
+    def send_controller_value(self, zctrl):
+        if self.instance is not None and zctrl.is_path:
+            self.send_path(zctrl)
+        elif self.instance is not None:
+            self.send(self.value_line(zctrl))
+            if zctrl is not self.bypass_zctrl:
+                self.compare_note_move(zctrl)
+
+    def refresh_values(self):
+        """Read every value back, after a preset or a state changed them in the plugin."""
+        values = self.read_values(s for s, z in self.zctrls.items() if z is not self.bypass_zctrl)
+        for symbol, value in values.items():
+            if value:
+                self.zctrls[symbol].set_value(float(value), False)
+        for symbol in self.path_zctrls:
+            path = self.read_path(symbol)
+            if path:
+                self.path_zctrls[symbol].set_value(path, False)
+        self.compare_settle()
+
+    # ---- Files ----
+    # A plugin that plays a sample, a kit or an SFZ takes the file through a patch property whose range is a path
+    # (atom:Path). The properties are the plugin's own: their URIs and file types are read from its TTL (zynthian_lv2),
+    # never typed here, and each is a controller that opens the file browser. The file reaches the plugin as
+    # patch_set <instance> <property uri> <path>, the path in quotation marks (a space ends a word otherwise); patch_get
+    # reads it back. plugin-hostd keeps the line in the instance's ledger and puts it back after a worker respawn
+    # (plugin-hostd-protocol: patch_set is a recorded state verb, keyed by its property); a daemon that is replaced
+    # is given it again by replay_lines, a snapshot keeps it as the controller's value, a user preset in its "patch" member.
+
+    def path_properties(self):
+        """[(symbol, name, property URI, file types)] of the plugin's file properties: an LV2 plugin's patch:writable
+        properties whose range is atom:Path. A CLAP plugin has none."""
+        if not self.is_lv2():
+            return []
+        try:
+            from zyngine import zynthian_lv2
+            ports = zynthian_lv2.get_plugin_ports(self.plugin_uri).values()
+        except Exception as e:
+            log_once(("paths", self.plugin_uri), "no file properties for %s: %s", self.plugin_uri, e)
+            return []
+        return [(p["symbol"], p["name"], p["uri"], p.get("path_file_types")) for p in ports
+                if p.get("is_path") and p.get("uri")]
+
+    def build_path_controllers(self):
+        zctrls = {}
+        for symbol, name, uri, types in self.path_properties():
+            if symbol in self.zctrls:
+                continue
+            self.path_uris[symbol] = uri
+            zctrls[symbol] = zynthian_controller(self, symbol, {
+                "name": name, "group_symbol": "files", "group_name": "Files", "value": "", "value_default": "",
+                "value_min": None, "value_max": None, "is_path": True, "path_file_types": types,
+                "display_priority": len(self.zctrls) + 1})
+        return zctrls
+
+    def path_line(self, zctrl):
+        """The patch_set of a chosen file, "" for none (a file cannot be taken back, only replaced)."""
+        if not zctrl.value:
+            return ""
+        return f"patch_set {self.instance} {self.path_uris[zctrl.symbol]} {zynthian_plugin_hostd_protocol.quote(zctrl.value)}"
+
+    def path_lines(self):
+        return [line for line in (self.path_line(z) for z in self.path_zctrls.values()) if line]
+
+    def read_path(self, symbol):
+        """The file the plugin reports for the property (patch_get), "" when it has none, None when the daemon has no answer."""
+        return self.send_quiet(f"patch_get {self.instance} {self.path_uris[symbol]}")
+
+    def send_path(self, zctrl):
+        """Give the plugin the file; patch_get tells whether it kept it, and a plugin that did not is said."""
+        line = self.path_line(zctrl)
+        if not line or self.send(line) is None:
+            return False
+        kept = self.read_path(zctrl.symbol)
+        if kept != zctrl.value:
+            logging.warning(f"plugin-hostd {self.plugin_name} was given {zctrl.value} for {zctrl.symbol} and reports {kept}")
+            return False
+        return True
+
+    # ---- Compare ----
+    # Compare A/B/C/D and undo are omx-panel's (its docs/compare.md), one module for every host: here its command is run, its
+    # moves are sent as any controller's value and its document rides the snapshot.
+
+    def compare_values(self):
+        return {s: float(z.value) for s, z in self.zctrls.items() if z is not self.bypass_zctrl and not isinstance(z.value, str)}
+
+    def compare_settle(self):
+        """The values changed by something other than a controller: a step to come back to."""
+        values = self.compare_values()
+        if self.compare_settled and values != self.compare_settled:
+            self.compare_queue = (self.compare_queue + [self.compare_settled])[-COMPARE_QUEUE:]
+        self.compare_settled = values
+
+    def compare_note_move(self, zctrl):
+        """A controller moved. After a pause the values before it are a step to come back to; no process starts here."""
+        if self.compare_moving:
+            return
+        now = time.monotonic()
+        if now - self.compare_last_move > COMPARE_PAUSE and self.compare_settled:
+            self.compare_queue = (self.compare_queue + [dict(self.compare_settled)])[-COMPARE_QUEUE:]
+        self.compare_last_move = now
+        self.compare_settled[zctrl.symbol] = float(zctrl.value)
+
+    def compare_step(self, step):
+        """step: (op, slot) of `omx-panel compare`. None when it landed, else what went wrong, to tell the user."""
+        op, slot = step
+        panel = shutil.which("omx-panel")
+        if not panel:
+            return "omx-panel is not installed"
+        values = self.compare_values()
+        request = {"doc": self.compare_doc, "ring": self.compare_ring, "captures": self.compare_queue, "values": values}
+        try:
+            out = subprocess.run([panel, "compare", op, *(["--to", slot] if slot else [])], input=json.dumps(request),
+                                 capture_output=True, text=True, check=True, timeout=SLOW_TIMEOUT)
+            answer = json.loads(out.stdout)
+        except (OSError, ValueError, subprocess.SubprocessError) as e:
+            log_once(("compare", str(e)), "omx-panel compare %s failed (%s)", op, e)
+            return getattr(e, "stderr", None) or str(e)
+        self.compare_queue = [values] if op == "switch" else []
+        self.compare_ring = answer["ring"]
+        if op in ("switch", "copy"):
+            self.compare_doc = answer["doc"]
+        self.compare_moving = True
+        try:
+            for move in answer["moves"]:
+                zctrl = self.zctrls.get(move["symbol"])
+                if zctrl is not None:
+                    zctrl.set_value(move["value"], True)
+        finally:
+            self.compare_moving = False
+        self.compare_settled = self.compare_values()
+        return None
+
+    def compare_options(self):
+        """The rows of the processor's options: [(the step, title, help)]. None without an omx-panel that has it, the release
+        of the compare verbs, or a control to compare."""
+        panel = shutil.which("omx-panel")
+        if not panel or not self.compare_values():
+            return []
+        active = self.compare_doc["active"] if self.compare_doc else COMPARE_SLOTS[0]
+        rows = [(("switch", s), f"{chr(0x2612) if s == active else chr(0x2610)} Compare {s}",
+                 "Compare settings of this processor. Presets are not touched.") for s in COMPARE_SLOTS]
+        to = COMPARE_SLOTS[(COMPARE_SLOTS.index(active) + 1) % len(COMPARE_SLOTS)]
+        rows.append((("copy", to), f"Copy {active} to {to}", f"Put the running values in slot {to}."))
+        rows.append((("undo", None), "Undo", "Step back this processor's last change."))
+        rows.append((("redo", None), "Redo", "Step forward again."))
+        return rows
+
+    # ---- Presets ----
+    # Every plugin shows the same two banks, whatever its format: Factory, the presets the
+    # plugin ships, and User, the user's; plain names, sorted by name, the same save, rename and delete. The format is
+    # only in a preset's key: an LV2 preset's URI (its bundle's, or a user preset Zynthian saved under jalv, from
+    # zynthian_lv2's cache), a key of the daemon's preset_get for a CLAP preset, or the path of a preset file the worker
+    # wrote through preset_save. A bank with nothing in it shows one row that says so, which loads nothing.
+
+    NO_PRESETS = "No presets"
+    FACTORY = ("factory", None, "Factory", None)
+    USER = ("user", None, "User", None)
+
+    def is_lv2(self):
+        return not self.plugin_uri.startswith("clap:")
+
+    def lv2_preset_info(self):
+        from zyngine import zynthian_lv2
+        try:
+            return zynthian_lv2.get_plugin_presets_cache(self.plugin_name) or {}
+        except Exception as e:
+            log_once(("presets", self.nickname), "no LV2 presets cache for %s: %s", self.plugin_name, e)
+            return {}
+
+    def user_dir(self):
+        return os.path.join(self.my_data_dir, "presets", "plugin-hostd", re.sub(r"[^A-Za-z0-9._-]+", "_", self.plugin_name))
+
+    def is_lv2_user_url(self, url):
+        return isinstance(url, str) and url.startswith(f"file://{self.my_data_dir}/presets/lv2/")
+
+    def preset_files(self):
+        """[(path, name)] of the preset files the worker wrote for this plugin."""
+        found = []
+        try:
+            names = os.listdir(self.user_dir())
+        except OSError:
+            return found
+        for f in names:
+            if f.endswith(".json"):
+                path = os.path.join(self.user_dir(), f)
+                try:
+                    with open(path) as fh:
+                        found.append((path, json.load(fh).get("name") or f[:-5]))
+                except (OSError, ValueError) as e:
+                    log_once(("user-preset", path), "a user preset of %s cannot be read (%s): %s", self.plugin_name, path, e)
+        return found
+
+    def factory_presets(self):
+        """[(key, name)] of the presets the plugin ships."""
+        if self.is_lv2():
+            return [(p["url"], p["label"].replace("_", " ").strip()) for info in self.lv2_preset_info().values()
+                    for p in info.get("presets", []) if not self.is_lv2_user_url(p.get("url"))]
+        presets = []
+        try:
+            for i in range(daemon.call(f"preset_list {self.instance}")[0]):
+                key, _, name = daemon.call(f"preset_get {self.instance} {i}")[1].partition(" ")
+                presets.append((key, name or key))
+        except FAILURES as e:
+            log_once(("presets", self.nickname), "plugin-hostd lists no presets for %s: %s", self.plugin_name, e)
+        return presets
+
+    def user_presets(self):
+        """[(key, name)] of the user's presets: the files saved through plugin-hostd, and an LV2 plugin's under jalv."""
+        lv2 = [(p["url"], p["label"].replace("_", " ").strip()) for info in self.lv2_preset_info().values()
+               for p in info.get("presets", []) if self.is_lv2_user_url(p.get("url"))] if self.is_lv2() else []
+        return self.preset_files() + lv2
+
+    def get_bank_list(self, processor=None):
+        return [self.FACTORY, self.USER]
+
+    def set_bank(self, processor, bank):
+        return True
+
+    def get_preset_list(self, bank, processor=None):
+        user = bool(bank) and bank[0] == self.USER[0]
+        listed = self.user_presets() if user else self.factory_presets()
+        presets = [[key, None, name, (self.USER if user else self.FACTORY)[0]]
+                   for key, name in sorted(listed, key=lambda p: p[1].lower())]
+        return presets or [["", None, self.NO_PRESETS, ""]]
+
+    def is_preset_user(self, preset):
+        if not preset or not isinstance(preset[0], str):
+            return False
+        return preset[0] == self.USER[0] or preset[0].startswith(self.user_dir() + os.sep) or self.is_lv2_user_url(preset[0])
+
+    def edit_preset_file(self, path, **members):
+        with open(path) as fh:
+            doc = json.load(fh)
+        doc.update(members)
+        with open(path + ".tmp", "w") as fh:
+            json.dump(doc, fh, indent=2)
+        os.replace(path + ".tmp", path)
+
+    def preset_exists(self, bank, preset_name):
+        return any(name == preset_name.strip() for _, name in self.preset_files())
+
+    def save_preset(self, bank, preset_name):
+        """The instance into a user preset file through the worker (preset_save), whatever the bank asked; its path,
+        None when the save failed."""
+        name = preset_name.strip()
+        path = os.path.join(self.user_dir(), re.sub(r"[^A-Za-z0-9._-]+", "_", name) + ".json")
+        os.makedirs(self.user_dir(), exist_ok=True)
+        if self.send(f'preset_save {self.instance} {path} {zynthian_plugin_hostd_protocol.quote(name)}') is None:
+            return None
+        self.preset_key = path
+        files = {self.path_uris[s]: z.value for s, z in self.path_zctrls.items() if z.value}
+        if files:
+            self.edit_preset_file(path, patch=files)
+        for processor in self.processors:
+            if not processor.bank_list:
+                processor.get_bank_list()
+            processor.set_bank_by_id(self.USER[0])
+        return path
+
+    def delete_preset(self, bank, preset):
+        if preset and isinstance(preset[0], str) and preset[0].startswith(self.user_dir() + os.sep):
+            os.unlink(preset[0])
+        return len(self.user_presets())
+
+    def rename_preset(self, bank, preset, new_preset_name):
+        if preset and isinstance(preset[0], str) and preset[0].startswith(self.user_dir() + os.sep):
+            self.edit_preset_file(preset[0], name=new_preset_name.strip())
+
+    def set_preset(self, processor, preset, preload=False):
+        if not preset or not preset[0] or self.send(f"preset_load {self.instance} {preset[0]}") is None:
+            return False
+        self.preset_key = preset[0]
+        self.load_preset_files(preset[0])
+        self.refresh_values()
+        return True
+
+    def load_preset_files(self, key):
+        """The files a user preset names (its "patch" member, written by save_preset) go to the plugin."""
+        if not self.path_zctrls or not os.path.isfile(key):
+            return
+        try:
+            with open(key) as fh:
+                files = json.load(fh).get("patch") or {}
+        except (OSError, ValueError, AttributeError) as e:
+            log_once(("user-preset", key), "a user preset of %s cannot be read (%s): %s", self.plugin_name, key, e)
+            return
+        for symbol, zctrl in self.path_zctrls.items():
+            path = files.get(self.path_uris[symbol])
+            if path:
+                zctrl.set_value(path, False)
+                self.send_path(zctrl)
+
+    def cmp_presets(self, preset1, preset2):
+        try:
+            return preset1[0] == preset2[0]
+        except (TypeError, IndexError):
+            return False
+
+    # ---- Snapshots: the plugin's own state through state_save and state_load ----
+
+    def get_extended_config(self):
+        """What a snapshot keeps past the controllers: the plugin's state, and the Compare slots."""
+        config = self.state_config()
+        if self.compare_doc:
+            return {**(config or {"plugin": self.plugin_uri}), "compare": self.compare_doc}
+        return config
+
+    def state_config(self):
+        """The files state_save writes for this instance, as a base64 tar."""
+        if self.instance is None:
+            return None
+        with tempfile.TemporaryDirectory(prefix="ph-state-") as tmp:
+            try:
+                daemon.call(f"state_save {tmp}", SLOW_TIMEOUT)
+            except FAILURES as e:
+                log_once("state_save", "plugin-hostd state_save failed (%s): snapshots keep parameters and presets only", e)
+                return None
+            buf = io.BytesIO()
+            with tarfile.open(fileobj=buf, mode="w:gz") as tar:
+                for name in sorted(os.listdir(tmp)):
+                    m = STATE_FILE_RE.match(name)
+                    if m and int(m[1]) == self.instance:
+                        tar.add(os.path.join(tmp, name), arcname="effect_X" + name[m.end(1):])
+        return {"plugin": self.plugin_uri, "state": base64.b64encode(buf.getvalue()).decode()}
+
+    def set_extended_config(self, xconfig):
+        """Called before the processor is added: the state waits for the instance."""
+        if not xconfig or xconfig.get("plugin") != self.plugin_uri:
+            return
+        self.compare_doc = xconfig.get("compare")
+        if "state" not in xconfig:
+            return
+        if self.instance is None:
+            self.pending_state = xconfig
+        else:
+            self.load_state(xconfig)
+
+    def load_state(self, xconfig):
+        with tempfile.TemporaryDirectory(prefix="ph-state-") as tmp:
+            with tarfile.open(fileobj=io.BytesIO(base64.b64decode(xconfig["state"])), mode="r:gz") as tar:
+                for member in tar.getmembers():
+                    if member.name.startswith("effect_X") and ".." not in member.name:
+                        member.name = f"effect_{self.instance}" + member.name[len("effect_X"):]
+                        tar.extract(member, tmp, filter="data")
+            if self.send(f"state_load {tmp}", SLOW_TIMEOUT) is not None:
+                self.refresh_values()

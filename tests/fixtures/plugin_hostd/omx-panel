@@ -1,0 +1,106 @@
+#!/usr/bin/env python3
+# A stand-in for `omx-panel describe --descriptor <file> [--pages --per-page N | --layout] [--remote <file>]` and `compare`:
+# it replays what the real omx-panel (main after its pages PR) printed for the descriptors of this directory, kept
+# beside them as <name>.describe.json (no --pages) and <name>.pages<N>.json (--pages --per-page N); OMX_PANEL_REAL
+# (test_engine_plugin_hostd) runs the real command and compares it with these files, so they cannot drift. A width or a
+# descriptor with no record gets a plain cut (sections by group, Easy first). With --remote the Easy pages come first, then
+# the host's pages as given, cut as omx-panel's pagesOf pads them to the width. Each run is appended to $OMX_PANEL_STUB_LOG.
+import os
+import sys
+import json
+
+argv = sys.argv[1:]
+if os.environ.get("OMX_PANEL_STUB_LOG"):
+    with open(os.environ["OMX_PANEL_STUB_LOG"], "a") as f:
+        f.write(" ".join(argv) + "\n")
+if argv[:1] == ["compare"]:
+    # The stand-in for `omx-panel compare`: what the engine's wiring needs of tools/compare.mjs, no more
+    op, to = argv[1], argv[argv.index("--to") + 1] if "--to" in argv else None
+    data = json.load(sys.stdin)
+    values = data.get("values", {})
+    doc = data.get("doc") or {"format": "org.openmixer.compare/1", "active": "A", "slots": {}}
+    ring = data.get("ring") or {"undo": [], "redo": []}
+    ring["undo"] = ring["undo"] + data.get("captures", [])
+    target = None
+    if op == "switch":
+        target = doc["slots"].get(to)
+        doc["slots"][doc["active"]] = dict(values)
+        doc["slots"][to] = dict(target or values)
+        doc["active"] = to
+    elif op == "copy":
+        doc["slots"][to] = dict(values)
+    elif ring[op]:
+        target = ring[op].pop()
+        ring["redo" if op == "undo" else "undo"].append(dict(values))
+    moves = [{"symbol": k, "value": v} for k, v in sorted((target or {}).items()) if values.get(k) != v]
+    print(json.dumps({"doc": doc, "ring": ring, "moves": moves, "unknown": []}))
+    sys.exit(0)
+if argv[:1] != ["describe"]:
+    sys.exit(f"unknown command {argv[:1]}")
+path = argv[argv.index("--descriptor") + 1]
+base = path[:-len(".descriptor.json")] if path.endswith(".descriptor.json") else path
+if "--layout" in argv:
+    # the layout the renderer draws: <name>.layout.json when recorded, else one with nothing a screen draws (no bar
+    # group, display or meter); OMX_PANEL_STUB_NO_LAYOUT is an omx-panel before --layout, which prints the description
+    if not os.environ.get("OMX_PANEL_STUB_NO_LAYOUT"):
+        golden = f"{base}.layout.json"
+        if os.path.exists(golden):
+            with open(golden) as f:
+                print(f.read())
+        else:
+            print(json.dumps({"sections": [{"key": "controls", "label": "Controls"}], "controls": [], "displays": [],
+                              "meters": []}))
+        sys.exit(0)
+    argv.remove("--layout")
+if "--pages" not in argv:
+    kind = "describe"
+else:
+    kind = "pages" + argv[argv.index("--per-page") + 1] if "--per-page" in argv else "pages8"
+golden = f"{base}.{kind}.json"
+if os.path.exists(golden):
+    with open(golden) as f:
+        out = json.load(f)
+else:
+    # a descriptor with no record: a plain cut, in sections by the descriptor's groups, Easy first, as many slots as the width
+    width = int(argv[argv.index("--per-page") + 1]) if "--per-page" in argv else 8
+    with open(path) as f:
+        descriptor = json.load(f)
+    sections, controls = [], []
+    for c in descriptor["controls"]:
+        if c.get("hidden"):
+            continue
+        label = " / ".join(c.get("group") or ["Controls"])
+        if label not in sections:
+            sections.append(label)
+        unit = c.get("travel", {}).get("unit", "unknown")
+        widget = "knob"
+        if c.get("readonly"):
+            widget = "meter" if unit in ("dB", "dBFS", "dBu", "LUFS") else "display"
+        symbol = c["id"] if isinstance(c["id"], str) else f"p{c['id']}"
+        controls.append({"symbol": symbol, "param": c["id"], "section": sections.index(label), "label": c.get("label") or c["name"],
+                         "widget": widget})
+    if kind == "describe":
+        out = {"description": {"controls": controls}, "refusals": []}
+    else:
+        pages = []
+        easy = [c["param"] for key in (descriptor.get("easy") or []) for c in controls if c["symbol"] == key]
+        for k in range(0, len(easy), width):
+            slots = easy[k:k + width]
+            pages.append({"section": None, "sectionName": "Easy", "pageName": "Easy" if k == 0 else f"Easy {k // width + 1}",
+                          "ids": slots + [None] * (width - len(slots))})
+        for i, name in enumerate(sections):
+            ids = [c["param"] for c in controls if c["section"] == i and c["param"] not in easy]
+            count = (len(ids) + width - 1) // width
+            for k in range(count):
+                slots = ids[k * width:(k + 1) * width]
+                pages.append({"section": i, "sectionName": name, "pageName": f"{name} {k + 1}" if count > 1 else name,
+                              "ids": slots + [None] * (width - len(slots))})
+        out = pages
+if "--remote" in argv and "--pages" in argv:
+    with open(argv[argv.index("--remote") + 1]) as f:
+        remote = json.load(f)
+    width = len(out[0]["ids"])
+    easy = [p for p in out if p["sectionName"] == "Easy"]
+    out = easy + [{"section": None, "sectionName": r["name"], "pageName": r["name"], "ids": (r["ids"] + [None] * width)[:width]}
+                  for r in remote]
+print(json.dumps(out, indent=2))
