@@ -1,0 +1,2407 @@
+{
+ "layout": {
+  "origin": "authored",
+  "family": "eq",
+  "sections": [
+   {
+    "key": "hpf",
+    "labelKey": null,
+    "label": "HPF"
+   },
+   {
+    "key": "lpf",
+    "labelKey": null,
+    "label": "LPF"
+   },
+   {
+    "key": "bands.band_1",
+    "labelKey": null,
+    "label": "Bands / Band 1"
+   },
+   {
+    "key": "bands.band_2",
+    "labelKey": null,
+    "label": "Bands / Band 2"
+   },
+   {
+    "key": "bands.band_3",
+    "labelKey": null,
+    "label": "Bands / Band 3"
+   },
+   {
+    "key": "bands.band_4",
+    "labelKey": null,
+    "label": "Bands / Band 4"
+   },
+   {
+    "key": "bands.band_5",
+    "labelKey": null,
+    "label": "Bands / Band 5"
+   },
+   {
+    "key": "bands.band_6",
+    "labelKey": null,
+    "label": "Bands / Band 6"
+   },
+   {
+    "key": "bands.band_7",
+    "labelKey": null,
+    "label": "Bands / Band 7"
+   },
+   {
+    "key": "bands.band_8",
+    "labelKey": null,
+    "label": "Bands / Band 8"
+   }
+  ],
+  "controls": [
+   {
+    "symbol": "hpf_on",
+    "param": 0,
+    "section": 0,
+    "sectionKey": "hpf",
+    "widget": "switch",
+    "standard": {
+     "widget": "switch"
+    },
+    "labelKey": null,
+    "label": "HPF On",
+    "visible": null,
+    "mask": "0",
+    "unit": "",
+    "meaning": null
+   },
+   {
+    "symbol": "hpf_freq",
+    "param": 1,
+    "section": 0,
+    "sectionKey": "hpf",
+    "widget": "knob",
+    "standard": {
+     "widget": "knob"
+    },
+    "labelKey": null,
+    "label": "HPF Frequency",
+    "visible": null,
+    "mask": "0",
+    "unit": "Hz",
+    "meaning": "lowCut"
+   },
+   {
+    "symbol": "hpf_slope",
+    "param": 2,
+    "section": 0,
+    "sectionKey": "hpf",
+    "widget": "auto",
+    "standard": {
+     "widget": "selector"
+    },
+    "labelKey": null,
+    "label": "HPF Slope",
+    "visible": null,
+    "mask": "0",
+    "unit": "",
+    "meaning": "slope"
+   },
+   {
+    "symbol": "lpf_on",
+    "param": 3,
+    "section": 1,
+    "sectionKey": "lpf",
+    "widget": "switch",
+    "standard": {
+     "widget": "switch"
+    },
+    "labelKey": null,
+    "label": "LPF On",
+    "visible": null,
+    "mask": "0",
+    "unit": "",
+    "meaning": null
+   },
+   {
+    "symbol": "lpf_freq",
+    "param": 4,
+    "section": 1,
+    "sectionKey": "lpf",
+    "widget": "knob",
+    "standard": {
+     "widget": "knob"
+    },
+    "labelKey": null,
+    "label": "LPF Frequency",
+    "visible": null,
+    "mask": "0",
+    "unit": "Hz",
+    "meaning": "highCut"
+   },
+   {
+    "symbol": "lpf_slope",
+    "param": 5,
+    "section": 1,
+    "sectionKey": "lpf",
+    "widget": "auto",
+    "standard": {
+     "widget": "selector"
+    },
+    "labelKey": null,
+    "label": "LPF Slope",
+    "visible": null,
+    "mask": "0",
+    "unit": "",
+    "meaning": "slope"
+   },
+   {
+    "symbol": "b1_type",
+    "param": 6,
+    "section": 2,
+    "sectionKey": "bands.band_1",
+    "widget": "auto",
+    "standard": {
+     "widget": "selector"
+    },
+    "labelKey": null,
+    "label": "Band 1 Type",
+    "visible": null,
+    "mask": "0",
+    "unit": "",
+    "meaning": null
+   },
+   {
+    "symbol": "b1_freq",
+    "param": 7,
+    "section": 2,
+    "sectionKey": "bands.band_1",
+    "widget": "knob",
+    "standard": {
+     "widget": "knob"
+    },
+    "labelKey": null,
+    "label": "Band 1 Frequency",
+    "visible": null,
+    "mask": "0",
+    "unit": "Hz",
+    "meaning": "frequency"
+   },
+   {
+    "symbol": "b1_gain",
+    "param": 8,
+    "section": 2,
+    "sectionKey": "bands.band_1",
+    "widget": "knob",
+    "standard": {
+     "widget": "knob"
+    },
+    "labelKey": null,
+    "label": "Band 1 Gain",
+    "visible": null,
+    "mask": "0",
+    "unit": "dB",
+    "meaning": "gain"
+   },
+   {
+    "symbol": "b1_q",
+    "param": 9,
+    "section": 2,
+    "sectionKey": "bands.band_1",
+    "widget": "knob",
+    "standard": {
+     "widget": "knob"
+    },
+    "labelKey": null,
+    "label": "Band 1 Q",
+    "visible": null,
+    "mask": "0",
+    "unit": "",
+    "meaning": "q"
+   },
+   {
+    "symbol": "b1_on",
+    "param": 10,
+    "section": 2,
+    "sectionKey": "bands.band_1",
+    "widget": "switch",
+    "standard": {
+     "widget": "switch"
+    },
+    "labelKey": null,
+    "label": "Band 1 On",
+    "visible": null,
+    "mask": "0",
+    "unit": "",
+    "meaning": null
+   },
+   {
+    "symbol": "b2_type",
+    "param": 11,
+    "section": 3,
+    "sectionKey": "bands.band_2",
+    "widget": "auto",
+    "standard": {
+     "widget": "selector"
+    },
+    "labelKey": null,
+    "label": "Band 2 Type",
+    "visible": null,
+    "mask": "0",
+    "unit": "",
+    "meaning": null
+   },
+   {
+    "symbol": "b2_freq",
+    "param": 12,
+    "section": 3,
+    "sectionKey": "bands.band_2",
+    "widget": "knob",
+    "standard": {
+     "widget": "knob"
+    },
+    "labelKey": null,
+    "label": "Band 2 Frequency",
+    "visible": null,
+    "mask": "0",
+    "unit": "Hz",
+    "meaning": "frequency"
+   },
+   {
+    "symbol": "b2_gain",
+    "param": 13,
+    "section": 3,
+    "sectionKey": "bands.band_2",
+    "widget": "knob",
+    "standard": {
+     "widget": "knob"
+    },
+    "labelKey": null,
+    "label": "Band 2 Gain",
+    "visible": null,
+    "mask": "0",
+    "unit": "dB",
+    "meaning": "gain"
+   },
+   {
+    "symbol": "b2_q",
+    "param": 14,
+    "section": 3,
+    "sectionKey": "bands.band_2",
+    "widget": "knob",
+    "standard": {
+     "widget": "knob"
+    },
+    "labelKey": null,
+    "label": "Band 2 Q",
+    "visible": null,
+    "mask": "0",
+    "unit": "",
+    "meaning": "q"
+   },
+   {
+    "symbol": "b2_on",
+    "param": 15,
+    "section": 3,
+    "sectionKey": "bands.band_2",
+    "widget": "switch",
+    "standard": {
+     "widget": "switch"
+    },
+    "labelKey": null,
+    "label": "Band 2 On",
+    "visible": null,
+    "mask": "0",
+    "unit": "",
+    "meaning": null
+   },
+   {
+    "symbol": "b3_type",
+    "param": 16,
+    "section": 4,
+    "sectionKey": "bands.band_3",
+    "widget": "auto",
+    "standard": {
+     "widget": "selector"
+    },
+    "labelKey": null,
+    "label": "Band 3 Type",
+    "visible": null,
+    "mask": "0",
+    "unit": "",
+    "meaning": null
+   },
+   {
+    "symbol": "b3_freq",
+    "param": 17,
+    "section": 4,
+    "sectionKey": "bands.band_3",
+    "widget": "knob",
+    "standard": {
+     "widget": "knob"
+    },
+    "labelKey": null,
+    "label": "Band 3 Frequency",
+    "visible": null,
+    "mask": "0",
+    "unit": "Hz",
+    "meaning": "frequency"
+   },
+   {
+    "symbol": "b3_gain",
+    "param": 18,
+    "section": 4,
+    "sectionKey": "bands.band_3",
+    "widget": "knob",
+    "standard": {
+     "widget": "knob"
+    },
+    "labelKey": null,
+    "label": "Band 3 Gain",
+    "visible": null,
+    "mask": "0",
+    "unit": "dB",
+    "meaning": "gain"
+   },
+   {
+    "symbol": "b3_q",
+    "param": 19,
+    "section": 4,
+    "sectionKey": "bands.band_3",
+    "widget": "knob",
+    "standard": {
+     "widget": "knob"
+    },
+    "labelKey": null,
+    "label": "Band 3 Q",
+    "visible": null,
+    "mask": "0",
+    "unit": "",
+    "meaning": "q"
+   },
+   {
+    "symbol": "b3_on",
+    "param": 20,
+    "section": 4,
+    "sectionKey": "bands.band_3",
+    "widget": "switch",
+    "standard": {
+     "widget": "switch"
+    },
+    "labelKey": null,
+    "label": "Band 3 On",
+    "visible": null,
+    "mask": "0",
+    "unit": "",
+    "meaning": null
+   },
+   {
+    "symbol": "b4_type",
+    "param": 21,
+    "section": 5,
+    "sectionKey": "bands.band_4",
+    "widget": "auto",
+    "standard": {
+     "widget": "selector"
+    },
+    "labelKey": null,
+    "label": "Band 4 Type",
+    "visible": null,
+    "mask": "0",
+    "unit": "",
+    "meaning": null
+   },
+   {
+    "symbol": "b4_freq",
+    "param": 22,
+    "section": 5,
+    "sectionKey": "bands.band_4",
+    "widget": "knob",
+    "standard": {
+     "widget": "knob"
+    },
+    "labelKey": null,
+    "label": "Band 4 Frequency",
+    "visible": null,
+    "mask": "0",
+    "unit": "Hz",
+    "meaning": "frequency"
+   },
+   {
+    "symbol": "b4_gain",
+    "param": 23,
+    "section": 5,
+    "sectionKey": "bands.band_4",
+    "widget": "knob",
+    "standard": {
+     "widget": "knob"
+    },
+    "labelKey": null,
+    "label": "Band 4 Gain",
+    "visible": null,
+    "mask": "0",
+    "unit": "dB",
+    "meaning": "gain"
+   },
+   {
+    "symbol": "b4_q",
+    "param": 24,
+    "section": 5,
+    "sectionKey": "bands.band_4",
+    "widget": "knob",
+    "standard": {
+     "widget": "knob"
+    },
+    "labelKey": null,
+    "label": "Band 4 Q",
+    "visible": null,
+    "mask": "0",
+    "unit": "",
+    "meaning": "q"
+   },
+   {
+    "symbol": "b4_on",
+    "param": 25,
+    "section": 5,
+    "sectionKey": "bands.band_4",
+    "widget": "switch",
+    "standard": {
+     "widget": "switch"
+    },
+    "labelKey": null,
+    "label": "Band 4 On",
+    "visible": null,
+    "mask": "0",
+    "unit": "",
+    "meaning": null
+   },
+   {
+    "symbol": "b5_type",
+    "param": 26,
+    "section": 6,
+    "sectionKey": "bands.band_5",
+    "widget": "auto",
+    "standard": {
+     "widget": "selector"
+    },
+    "labelKey": null,
+    "label": "Band 5 Type",
+    "visible": null,
+    "mask": "0",
+    "unit": "",
+    "meaning": null
+   },
+   {
+    "symbol": "b5_freq",
+    "param": 27,
+    "section": 6,
+    "sectionKey": "bands.band_5",
+    "widget": "knob",
+    "standard": {
+     "widget": "knob"
+    },
+    "labelKey": null,
+    "label": "Band 5 Frequency",
+    "visible": null,
+    "mask": "0",
+    "unit": "Hz",
+    "meaning": "frequency"
+   },
+   {
+    "symbol": "b5_gain",
+    "param": 28,
+    "section": 6,
+    "sectionKey": "bands.band_5",
+    "widget": "knob",
+    "standard": {
+     "widget": "knob"
+    },
+    "labelKey": null,
+    "label": "Band 5 Gain",
+    "visible": null,
+    "mask": "0",
+    "unit": "dB",
+    "meaning": "gain"
+   },
+   {
+    "symbol": "b5_q",
+    "param": 29,
+    "section": 6,
+    "sectionKey": "bands.band_5",
+    "widget": "knob",
+    "standard": {
+     "widget": "knob"
+    },
+    "labelKey": null,
+    "label": "Band 5 Q",
+    "visible": null,
+    "mask": "0",
+    "unit": "",
+    "meaning": "q"
+   },
+   {
+    "symbol": "b5_on",
+    "param": 30,
+    "section": 6,
+    "sectionKey": "bands.band_5",
+    "widget": "switch",
+    "standard": {
+     "widget": "switch"
+    },
+    "labelKey": null,
+    "label": "Band 5 On",
+    "visible": null,
+    "mask": "0",
+    "unit": "",
+    "meaning": null
+   },
+   {
+    "symbol": "b6_type",
+    "param": 31,
+    "section": 7,
+    "sectionKey": "bands.band_6",
+    "widget": "auto",
+    "standard": {
+     "widget": "selector"
+    },
+    "labelKey": null,
+    "label": "Band 6 Type",
+    "visible": null,
+    "mask": "0",
+    "unit": "",
+    "meaning": null
+   },
+   {
+    "symbol": "b6_freq",
+    "param": 32,
+    "section": 7,
+    "sectionKey": "bands.band_6",
+    "widget": "knob",
+    "standard": {
+     "widget": "knob"
+    },
+    "labelKey": null,
+    "label": "Band 6 Frequency",
+    "visible": null,
+    "mask": "0",
+    "unit": "Hz",
+    "meaning": "frequency"
+   },
+   {
+    "symbol": "b6_gain",
+    "param": 33,
+    "section": 7,
+    "sectionKey": "bands.band_6",
+    "widget": "knob",
+    "standard": {
+     "widget": "knob"
+    },
+    "labelKey": null,
+    "label": "Band 6 Gain",
+    "visible": null,
+    "mask": "0",
+    "unit": "dB",
+    "meaning": "gain"
+   },
+   {
+    "symbol": "b6_q",
+    "param": 34,
+    "section": 7,
+    "sectionKey": "bands.band_6",
+    "widget": "knob",
+    "standard": {
+     "widget": "knob"
+    },
+    "labelKey": null,
+    "label": "Band 6 Q",
+    "visible": null,
+    "mask": "0",
+    "unit": "",
+    "meaning": "q"
+   },
+   {
+    "symbol": "b6_on",
+    "param": 35,
+    "section": 7,
+    "sectionKey": "bands.band_6",
+    "widget": "switch",
+    "standard": {
+     "widget": "switch"
+    },
+    "labelKey": null,
+    "label": "Band 6 On",
+    "visible": null,
+    "mask": "0",
+    "unit": "",
+    "meaning": null
+   },
+   {
+    "symbol": "b7_type",
+    "param": 36,
+    "section": 8,
+    "sectionKey": "bands.band_7",
+    "widget": "auto",
+    "standard": {
+     "widget": "selector"
+    },
+    "labelKey": null,
+    "label": "Band 7 Type",
+    "visible": null,
+    "mask": "0",
+    "unit": "",
+    "meaning": null
+   },
+   {
+    "symbol": "b7_freq",
+    "param": 37,
+    "section": 8,
+    "sectionKey": "bands.band_7",
+    "widget": "knob",
+    "standard": {
+     "widget": "knob"
+    },
+    "labelKey": null,
+    "label": "Band 7 Frequency",
+    "visible": null,
+    "mask": "0",
+    "unit": "Hz",
+    "meaning": "frequency"
+   },
+   {
+    "symbol": "b7_gain",
+    "param": 38,
+    "section": 8,
+    "sectionKey": "bands.band_7",
+    "widget": "knob",
+    "standard": {
+     "widget": "knob"
+    },
+    "labelKey": null,
+    "label": "Band 7 Gain",
+    "visible": null,
+    "mask": "0",
+    "unit": "dB",
+    "meaning": "gain"
+   },
+   {
+    "symbol": "b7_q",
+    "param": 39,
+    "section": 8,
+    "sectionKey": "bands.band_7",
+    "widget": "knob",
+    "standard": {
+     "widget": "knob"
+    },
+    "labelKey": null,
+    "label": "Band 7 Q",
+    "visible": null,
+    "mask": "0",
+    "unit": "",
+    "meaning": "q"
+   },
+   {
+    "symbol": "b7_on",
+    "param": 40,
+    "section": 8,
+    "sectionKey": "bands.band_7",
+    "widget": "switch",
+    "standard": {
+     "widget": "switch"
+    },
+    "labelKey": null,
+    "label": "Band 7 On",
+    "visible": null,
+    "mask": "0",
+    "unit": "",
+    "meaning": null
+   },
+   {
+    "symbol": "b8_type",
+    "param": 41,
+    "section": 9,
+    "sectionKey": "bands.band_8",
+    "widget": "auto",
+    "standard": {
+     "widget": "selector"
+    },
+    "labelKey": null,
+    "label": "Band 8 Type",
+    "visible": null,
+    "mask": "0",
+    "unit": "",
+    "meaning": null
+   },
+   {
+    "symbol": "b8_freq",
+    "param": 42,
+    "section": 9,
+    "sectionKey": "bands.band_8",
+    "widget": "knob",
+    "standard": {
+     "widget": "knob"
+    },
+    "labelKey": null,
+    "label": "Band 8 Frequency",
+    "visible": null,
+    "mask": "0",
+    "unit": "Hz",
+    "meaning": "frequency"
+   },
+   {
+    "symbol": "b8_gain",
+    "param": 43,
+    "section": 9,
+    "sectionKey": "bands.band_8",
+    "widget": "knob",
+    "standard": {
+     "widget": "knob"
+    },
+    "labelKey": null,
+    "label": "Band 8 Gain",
+    "visible": null,
+    "mask": "0",
+    "unit": "dB",
+    "meaning": "gain"
+   },
+   {
+    "symbol": "b8_q",
+    "param": 44,
+    "section": 9,
+    "sectionKey": "bands.band_8",
+    "widget": "knob",
+    "standard": {
+     "widget": "knob"
+    },
+    "labelKey": null,
+    "label": "Band 8 Q",
+    "visible": null,
+    "mask": "0",
+    "unit": "",
+    "meaning": "q"
+   },
+   {
+    "symbol": "b8_on",
+    "param": 45,
+    "section": 9,
+    "sectionKey": "bands.band_8",
+    "widget": "switch",
+    "standard": {
+     "widget": "switch"
+    },
+    "labelKey": null,
+    "label": "Band 8 On",
+    "visible": null,
+    "mask": "0",
+    "unit": "",
+    "meaning": null
+   }
+  ],
+  "roles": [
+   {
+    "role": "hpf_freq",
+    "index": 0,
+    "symbol": "hpf_freq",
+    "param": 1,
+    "unit": "Hz"
+   },
+   {
+    "role": "lpf_freq",
+    "index": 0,
+    "symbol": "lpf_freq",
+    "param": 4,
+    "unit": "Hz"
+   },
+   {
+    "role": "band_freq",
+    "index": 0,
+    "symbol": "b1_freq",
+    "param": 7,
+    "unit": "Hz"
+   },
+   {
+    "role": "band_gain",
+    "index": 0,
+    "symbol": "b1_gain",
+    "param": 8,
+    "unit": "dB"
+   },
+   {
+    "role": "band_q",
+    "index": 0,
+    "symbol": "b1_q",
+    "param": 9,
+    "unit": ""
+   },
+   {
+    "role": "band_freq",
+    "index": 1,
+    "symbol": "b2_freq",
+    "param": 12,
+    "unit": "Hz"
+   },
+   {
+    "role": "band_gain",
+    "index": 1,
+    "symbol": "b2_gain",
+    "param": 13,
+    "unit": "dB"
+   },
+   {
+    "role": "band_q",
+    "index": 1,
+    "symbol": "b2_q",
+    "param": 14,
+    "unit": ""
+   },
+   {
+    "role": "band_freq",
+    "index": 2,
+    "symbol": "b3_freq",
+    "param": 17,
+    "unit": "Hz"
+   },
+   {
+    "role": "band_gain",
+    "index": 2,
+    "symbol": "b3_gain",
+    "param": 18,
+    "unit": "dB"
+   },
+   {
+    "role": "band_q",
+    "index": 2,
+    "symbol": "b3_q",
+    "param": 19,
+    "unit": ""
+   },
+   {
+    "role": "band_freq",
+    "index": 3,
+    "symbol": "b4_freq",
+    "param": 22,
+    "unit": "Hz"
+   },
+   {
+    "role": "band_gain",
+    "index": 3,
+    "symbol": "b4_gain",
+    "param": 23,
+    "unit": "dB"
+   },
+   {
+    "role": "band_q",
+    "index": 3,
+    "symbol": "b4_q",
+    "param": 24,
+    "unit": ""
+   },
+   {
+    "role": "band_freq",
+    "index": 4,
+    "symbol": "b5_freq",
+    "param": 27,
+    "unit": "Hz"
+   },
+   {
+    "role": "band_gain",
+    "index": 4,
+    "symbol": "b5_gain",
+    "param": 28,
+    "unit": "dB"
+   },
+   {
+    "role": "band_q",
+    "index": 4,
+    "symbol": "b5_q",
+    "param": 29,
+    "unit": ""
+   },
+   {
+    "role": "band_freq",
+    "index": 5,
+    "symbol": "b6_freq",
+    "param": 32,
+    "unit": "Hz"
+   },
+   {
+    "role": "band_gain",
+    "index": 5,
+    "symbol": "b6_gain",
+    "param": 33,
+    "unit": "dB"
+   },
+   {
+    "role": "band_q",
+    "index": 5,
+    "symbol": "b6_q",
+    "param": 34,
+    "unit": ""
+   },
+   {
+    "role": "band_freq",
+    "index": 6,
+    "symbol": "b7_freq",
+    "param": 37,
+    "unit": "Hz"
+   },
+   {
+    "role": "band_gain",
+    "index": 6,
+    "symbol": "b7_gain",
+    "param": 38,
+    "unit": "dB"
+   },
+   {
+    "role": "band_q",
+    "index": 6,
+    "symbol": "b7_q",
+    "param": 39,
+    "unit": ""
+   },
+   {
+    "role": "band_freq",
+    "index": 7,
+    "symbol": "b8_freq",
+    "param": 42,
+    "unit": "Hz"
+   },
+   {
+    "role": "band_gain",
+    "index": 7,
+    "symbol": "b8_gain",
+    "param": 43,
+    "unit": "dB"
+   },
+   {
+    "role": "band_q",
+    "index": 7,
+    "symbol": "b8_q",
+    "param": 44,
+    "unit": ""
+   }
+  ],
+  "unpublished": [],
+  "displays": [
+   {
+    "kind": "eq_response",
+    "section": 2,
+    "sectionKey": "bands.band_1",
+    "source": "family",
+    "meters": [
+     null,
+     null
+    ],
+    "curve": null,
+    "floor": null,
+    "labelKey": null,
+    "label": "Bands / Band 1",
+    "basis": "modelled"
+   }
+  ],
+  "defaults": [],
+  "ports": {
+   "inputs": [
+    {
+     "id": 0,
+     "name": "in",
+     "role": "main",
+     "channels": 2
+    }
+   ],
+   "outputs": [
+    {
+     "id": 0,
+     "name": "out",
+     "role": "main",
+     "channels": 2
+    }
+   ],
+   "sidechain": false,
+   "notes": false
+  },
+  "easy": [
+   "b1_gain",
+   "b2_gain",
+   "b4_gain",
+   "b5_gain",
+   "b7_gain",
+   "b8_gain"
+  ],
+  "meters": [],
+  "meterRefusals": []
+ },
+ "description": {
+  "family": "eq",
+  "fingerprint": "386d3e93d776acf3b01f35a4d621357903c67e3041fb457e285203f3175c6338",
+  "easy": [
+   "b1_gain",
+   "b2_gain",
+   "b4_gain",
+   "b5_gain",
+   "b7_gain",
+   "b8_gain"
+  ],
+  "params": [
+   {
+    "kind": "number",
+    "symbol": "hpf_on",
+    "name": "HPF On",
+    "unit": "none",
+    "scale": "stepped",
+    "step": 1,
+    "min": 0,
+    "max": 1,
+    "default": 0
+   },
+   {
+    "kind": "number",
+    "symbol": "hpf_freq",
+    "name": "HPF Frequency",
+    "unit": "hz",
+    "scale": "stepped",
+    "step": 1,
+    "min": 20,
+    "max": 1000,
+    "default": 80
+   },
+   {
+    "kind": "number",
+    "symbol": "hpf_slope",
+    "name": "HPF Slope",
+    "unit": "none",
+    "scale": "stepped",
+    "step": 1,
+    "min": 12,
+    "max": 24,
+    "default": 12,
+    "enumLabels": [
+     "12 dB/oct",
+     "13",
+     "14",
+     "15",
+     "16",
+     "17",
+     "18",
+     "19",
+     "20",
+     "21",
+     "22",
+     "23",
+     "24 dB/oct"
+    ]
+   },
+   {
+    "kind": "number",
+    "symbol": "lpf_on",
+    "name": "LPF On",
+    "unit": "none",
+    "scale": "stepped",
+    "step": 1,
+    "min": 0,
+    "max": 1,
+    "default": 0
+   },
+   {
+    "kind": "number",
+    "symbol": "lpf_freq",
+    "name": "LPF Frequency",
+    "unit": "hz",
+    "scale": "stepped",
+    "step": 1,
+    "min": 1000,
+    "max": 20000,
+    "default": 18000
+   },
+   {
+    "kind": "number",
+    "symbol": "lpf_slope",
+    "name": "LPF Slope",
+    "unit": "none",
+    "scale": "stepped",
+    "step": 1,
+    "min": 12,
+    "max": 24,
+    "default": 12,
+    "enumLabels": [
+     "12 dB/oct",
+     "13",
+     "14",
+     "15",
+     "16",
+     "17",
+     "18",
+     "19",
+     "20",
+     "21",
+     "22",
+     "23",
+     "24 dB/oct"
+    ]
+   },
+   {
+    "kind": "number",
+    "symbol": "b1_type",
+    "name": "Band 1 Type",
+    "unit": "none",
+    "scale": "stepped",
+    "step": 1,
+    "min": 0,
+    "max": 5,
+    "default": 1,
+    "enumLabels": [
+     "Bell",
+     "Low Shelf",
+     "High Shelf",
+     "Notch",
+     "All-pass 1st",
+     "All-pass 2nd"
+    ]
+   },
+   {
+    "kind": "number",
+    "symbol": "b1_freq",
+    "name": "Band 1 Frequency",
+    "unit": "hz",
+    "scale": "stepped",
+    "step": 1,
+    "min": 20,
+    "max": 20000,
+    "default": 32
+   },
+   {
+    "kind": "number",
+    "symbol": "b1_gain",
+    "name": "Band 1 Gain",
+    "unit": "db",
+    "scale": "linear",
+    "step": 0,
+    "min": -15,
+    "max": 15,
+    "default": 0
+   },
+   {
+    "kind": "number",
+    "symbol": "b1_q",
+    "name": "Band 1 Q",
+    "unit": "none",
+    "scale": "linear",
+    "step": 0,
+    "min": 0.3,
+    "max": 116,
+    "default": 1
+   },
+   {
+    "kind": "number",
+    "symbol": "b1_on",
+    "name": "Band 1 On",
+    "unit": "none",
+    "scale": "stepped",
+    "step": 1,
+    "min": 0,
+    "max": 1,
+    "default": 0
+   },
+   {
+    "kind": "number",
+    "symbol": "b2_type",
+    "name": "Band 2 Type",
+    "unit": "none",
+    "scale": "stepped",
+    "step": 1,
+    "min": 0,
+    "max": 5,
+    "default": 0,
+    "enumLabels": [
+     "Bell",
+     "Low Shelf",
+     "High Shelf",
+     "Notch",
+     "All-pass 1st",
+     "All-pass 2nd"
+    ]
+   },
+   {
+    "kind": "number",
+    "symbol": "b2_freq",
+    "name": "Band 2 Frequency",
+    "unit": "hz",
+    "scale": "stepped",
+    "step": 1,
+    "min": 20,
+    "max": 20000,
+    "default": 80
+   },
+   {
+    "kind": "number",
+    "symbol": "b2_gain",
+    "name": "Band 2 Gain",
+    "unit": "db",
+    "scale": "linear",
+    "step": 0,
+    "min": -15,
+    "max": 15,
+    "default": 0
+   },
+   {
+    "kind": "number",
+    "symbol": "b2_q",
+    "name": "Band 2 Q",
+    "unit": "none",
+    "scale": "linear",
+    "step": 0,
+    "min": 0.3,
+    "max": 116,
+    "default": 1
+   },
+   {
+    "kind": "number",
+    "symbol": "b2_on",
+    "name": "Band 2 On",
+    "unit": "none",
+    "scale": "stepped",
+    "step": 1,
+    "min": 0,
+    "max": 1,
+    "default": 0
+   },
+   {
+    "kind": "number",
+    "symbol": "b3_type",
+    "name": "Band 3 Type",
+    "unit": "none",
+    "scale": "stepped",
+    "step": 1,
+    "min": 0,
+    "max": 5,
+    "default": 0,
+    "enumLabels": [
+     "Bell",
+     "Low Shelf",
+     "High Shelf",
+     "Notch",
+     "All-pass 1st",
+     "All-pass 2nd"
+    ]
+   },
+   {
+    "kind": "number",
+    "symbol": "b3_freq",
+    "name": "Band 3 Frequency",
+    "unit": "hz",
+    "scale": "stepped",
+    "step": 1,
+    "min": 20,
+    "max": 20000,
+    "default": 160
+   },
+   {
+    "kind": "number",
+    "symbol": "b3_gain",
+    "name": "Band 3 Gain",
+    "unit": "db",
+    "scale": "linear",
+    "step": 0,
+    "min": -15,
+    "max": 15,
+    "default": 0
+   },
+   {
+    "kind": "number",
+    "symbol": "b3_q",
+    "name": "Band 3 Q",
+    "unit": "none",
+    "scale": "linear",
+    "step": 0,
+    "min": 0.3,
+    "max": 116,
+    "default": 1
+   },
+   {
+    "kind": "number",
+    "symbol": "b3_on",
+    "name": "Band 3 On",
+    "unit": "none",
+    "scale": "stepped",
+    "step": 1,
+    "min": 0,
+    "max": 1,
+    "default": 0
+   },
+   {
+    "kind": "number",
+    "symbol": "b4_type",
+    "name": "Band 4 Type",
+    "unit": "none",
+    "scale": "stepped",
+    "step": 1,
+    "min": 0,
+    "max": 5,
+    "default": 0,
+    "enumLabels": [
+     "Bell",
+     "Low Shelf",
+     "High Shelf",
+     "Notch",
+     "All-pass 1st",
+     "All-pass 2nd"
+    ]
+   },
+   {
+    "kind": "number",
+    "symbol": "b4_freq",
+    "name": "Band 4 Frequency",
+    "unit": "hz",
+    "scale": "stepped",
+    "step": 1,
+    "min": 20,
+    "max": 20000,
+    "default": 400
+   },
+   {
+    "kind": "number",
+    "symbol": "b4_gain",
+    "name": "Band 4 Gain",
+    "unit": "db",
+    "scale": "linear",
+    "step": 0,
+    "min": -15,
+    "max": 15,
+    "default": 0
+   },
+   {
+    "kind": "number",
+    "symbol": "b4_q",
+    "name": "Band 4 Q",
+    "unit": "none",
+    "scale": "linear",
+    "step": 0,
+    "min": 0.3,
+    "max": 116,
+    "default": 1
+   },
+   {
+    "kind": "number",
+    "symbol": "b4_on",
+    "name": "Band 4 On",
+    "unit": "none",
+    "scale": "stepped",
+    "step": 1,
+    "min": 0,
+    "max": 1,
+    "default": 0
+   },
+   {
+    "kind": "number",
+    "symbol": "b5_type",
+    "name": "Band 5 Type",
+    "unit": "none",
+    "scale": "stepped",
+    "step": 1,
+    "min": 0,
+    "max": 5,
+    "default": 0,
+    "enumLabels": [
+     "Bell",
+     "Low Shelf",
+     "High Shelf",
+     "Notch",
+     "All-pass 1st",
+     "All-pass 2nd"
+    ]
+   },
+   {
+    "kind": "number",
+    "symbol": "b5_freq",
+    "name": "Band 5 Frequency",
+    "unit": "hz",
+    "scale": "stepped",
+    "step": 1,
+    "min": 20,
+    "max": 20000,
+    "default": 1000
+   },
+   {
+    "kind": "number",
+    "symbol": "b5_gain",
+    "name": "Band 5 Gain",
+    "unit": "db",
+    "scale": "linear",
+    "step": 0,
+    "min": -15,
+    "max": 15,
+    "default": 0
+   },
+   {
+    "kind": "number",
+    "symbol": "b5_q",
+    "name": "Band 5 Q",
+    "unit": "none",
+    "scale": "linear",
+    "step": 0,
+    "min": 0.3,
+    "max": 116,
+    "default": 1
+   },
+   {
+    "kind": "number",
+    "symbol": "b5_on",
+    "name": "Band 5 On",
+    "unit": "none",
+    "scale": "stepped",
+    "step": 1,
+    "min": 0,
+    "max": 1,
+    "default": 0
+   },
+   {
+    "kind": "number",
+    "symbol": "b6_type",
+    "name": "Band 6 Type",
+    "unit": "none",
+    "scale": "stepped",
+    "step": 1,
+    "min": 0,
+    "max": 5,
+    "default": 0,
+    "enumLabels": [
+     "Bell",
+     "Low Shelf",
+     "High Shelf",
+     "Notch",
+     "All-pass 1st",
+     "All-pass 2nd"
+    ]
+   },
+   {
+    "kind": "number",
+    "symbol": "b6_freq",
+    "name": "Band 6 Frequency",
+    "unit": "hz",
+    "scale": "stepped",
+    "step": 1,
+    "min": 20,
+    "max": 20000,
+    "default": 2500
+   },
+   {
+    "kind": "number",
+    "symbol": "b6_gain",
+    "name": "Band 6 Gain",
+    "unit": "db",
+    "scale": "linear",
+    "step": 0,
+    "min": -15,
+    "max": 15,
+    "default": 0
+   },
+   {
+    "kind": "number",
+    "symbol": "b6_q",
+    "name": "Band 6 Q",
+    "unit": "none",
+    "scale": "linear",
+    "step": 0,
+    "min": 0.3,
+    "max": 116,
+    "default": 1
+   },
+   {
+    "kind": "number",
+    "symbol": "b6_on",
+    "name": "Band 6 On",
+    "unit": "none",
+    "scale": "stepped",
+    "step": 1,
+    "min": 0,
+    "max": 1,
+    "default": 0
+   },
+   {
+    "kind": "number",
+    "symbol": "b7_type",
+    "name": "Band 7 Type",
+    "unit": "none",
+    "scale": "stepped",
+    "step": 1,
+    "min": 0,
+    "max": 5,
+    "default": 0,
+    "enumLabels": [
+     "Bell",
+     "Low Shelf",
+     "High Shelf",
+     "Notch",
+     "All-pass 1st",
+     "All-pass 2nd"
+    ]
+   },
+   {
+    "kind": "number",
+    "symbol": "b7_freq",
+    "name": "Band 7 Frequency",
+    "unit": "hz",
+    "scale": "stepped",
+    "step": 1,
+    "min": 20,
+    "max": 20000,
+    "default": 5000
+   },
+   {
+    "kind": "number",
+    "symbol": "b7_gain",
+    "name": "Band 7 Gain",
+    "unit": "db",
+    "scale": "linear",
+    "step": 0,
+    "min": -15,
+    "max": 15,
+    "default": 0
+   },
+   {
+    "kind": "number",
+    "symbol": "b7_q",
+    "name": "Band 7 Q",
+    "unit": "none",
+    "scale": "linear",
+    "step": 0,
+    "min": 0.3,
+    "max": 116,
+    "default": 1
+   },
+   {
+    "kind": "number",
+    "symbol": "b7_on",
+    "name": "Band 7 On",
+    "unit": "none",
+    "scale": "stepped",
+    "step": 1,
+    "min": 0,
+    "max": 1,
+    "default": 0
+   },
+   {
+    "kind": "number",
+    "symbol": "b8_type",
+    "name": "Band 8 Type",
+    "unit": "none",
+    "scale": "stepped",
+    "step": 1,
+    "min": 0,
+    "max": 5,
+    "default": 2,
+    "enumLabels": [
+     "Bell",
+     "Low Shelf",
+     "High Shelf",
+     "Notch",
+     "All-pass 1st",
+     "All-pass 2nd"
+    ]
+   },
+   {
+    "kind": "number",
+    "symbol": "b8_freq",
+    "name": "Band 8 Frequency",
+    "unit": "hz",
+    "scale": "stepped",
+    "step": 1,
+    "min": 20,
+    "max": 20000,
+    "default": 12500
+   },
+   {
+    "kind": "number",
+    "symbol": "b8_gain",
+    "name": "Band 8 Gain",
+    "unit": "db",
+    "scale": "linear",
+    "step": 0,
+    "min": -15,
+    "max": 15,
+    "default": 0
+   },
+   {
+    "kind": "number",
+    "symbol": "b8_q",
+    "name": "Band 8 Q",
+    "unit": "none",
+    "scale": "linear",
+    "step": 0,
+    "min": 0.3,
+    "max": 116,
+    "default": 1
+   },
+   {
+    "kind": "number",
+    "symbol": "b8_on",
+    "name": "Band 8 On",
+    "unit": "none",
+    "scale": "stepped",
+    "step": 1,
+    "min": 0,
+    "max": 1,
+    "default": 0
+   }
+  ],
+  "sections": [
+   {
+    "key": "hpf",
+    "labelKey": "",
+    "label": "HPF"
+   },
+   {
+    "key": "lpf",
+    "labelKey": "",
+    "label": "LPF"
+   },
+   {
+    "key": "bands.band_1",
+    "labelKey": "",
+    "label": "Bands / Band 1"
+   },
+   {
+    "key": "bands.band_2",
+    "labelKey": "",
+    "label": "Bands / Band 2"
+   },
+   {
+    "key": "bands.band_3",
+    "labelKey": "",
+    "label": "Bands / Band 3"
+   },
+   {
+    "key": "bands.band_4",
+    "labelKey": "",
+    "label": "Bands / Band 4"
+   },
+   {
+    "key": "bands.band_5",
+    "labelKey": "",
+    "label": "Bands / Band 5"
+   },
+   {
+    "key": "bands.band_6",
+    "labelKey": "",
+    "label": "Bands / Band 6"
+   },
+   {
+    "key": "bands.band_7",
+    "labelKey": "",
+    "label": "Bands / Band 7"
+   },
+   {
+    "key": "bands.band_8",
+    "labelKey": "",
+    "label": "Bands / Band 8"
+   }
+  ],
+  "controls": [
+   {
+    "symbol": "hpf_on",
+    "section": "hpf",
+    "widget": "switch",
+    "labelKey": "",
+    "label": "HPF On",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "hpf_freq",
+    "section": "hpf",
+    "widget": "knob",
+    "labelKey": "",
+    "label": "HPF Frequency",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "hpf_slope",
+    "section": "hpf",
+    "widget": "auto",
+    "labelKey": "",
+    "label": "HPF Slope",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "lpf_on",
+    "section": "lpf",
+    "widget": "switch",
+    "labelKey": "",
+    "label": "LPF On",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "lpf_freq",
+    "section": "lpf",
+    "widget": "knob",
+    "labelKey": "",
+    "label": "LPF Frequency",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "lpf_slope",
+    "section": "lpf",
+    "widget": "auto",
+    "labelKey": "",
+    "label": "LPF Slope",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "b1_type",
+    "section": "bands.band_1",
+    "widget": "auto",
+    "labelKey": "",
+    "label": "Band 1 Type",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "b1_freq",
+    "section": "bands.band_1",
+    "widget": "knob",
+    "labelKey": "",
+    "label": "Band 1 Frequency",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "b1_gain",
+    "section": "bands.band_1",
+    "widget": "knob",
+    "labelKey": "",
+    "label": "Band 1 Gain",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "b1_q",
+    "section": "bands.band_1",
+    "widget": "knob",
+    "labelKey": "",
+    "label": "Band 1 Q",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "b1_on",
+    "section": "bands.band_1",
+    "widget": "switch",
+    "labelKey": "",
+    "label": "Band 1 On",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "b2_type",
+    "section": "bands.band_2",
+    "widget": "auto",
+    "labelKey": "",
+    "label": "Band 2 Type",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "b2_freq",
+    "section": "bands.band_2",
+    "widget": "knob",
+    "labelKey": "",
+    "label": "Band 2 Frequency",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "b2_gain",
+    "section": "bands.band_2",
+    "widget": "knob",
+    "labelKey": "",
+    "label": "Band 2 Gain",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "b2_q",
+    "section": "bands.band_2",
+    "widget": "knob",
+    "labelKey": "",
+    "label": "Band 2 Q",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "b2_on",
+    "section": "bands.band_2",
+    "widget": "switch",
+    "labelKey": "",
+    "label": "Band 2 On",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "b3_type",
+    "section": "bands.band_3",
+    "widget": "auto",
+    "labelKey": "",
+    "label": "Band 3 Type",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "b3_freq",
+    "section": "bands.band_3",
+    "widget": "knob",
+    "labelKey": "",
+    "label": "Band 3 Frequency",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "b3_gain",
+    "section": "bands.band_3",
+    "widget": "knob",
+    "labelKey": "",
+    "label": "Band 3 Gain",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "b3_q",
+    "section": "bands.band_3",
+    "widget": "knob",
+    "labelKey": "",
+    "label": "Band 3 Q",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "b3_on",
+    "section": "bands.band_3",
+    "widget": "switch",
+    "labelKey": "",
+    "label": "Band 3 On",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "b4_type",
+    "section": "bands.band_4",
+    "widget": "auto",
+    "labelKey": "",
+    "label": "Band 4 Type",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "b4_freq",
+    "section": "bands.band_4",
+    "widget": "knob",
+    "labelKey": "",
+    "label": "Band 4 Frequency",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "b4_gain",
+    "section": "bands.band_4",
+    "widget": "knob",
+    "labelKey": "",
+    "label": "Band 4 Gain",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "b4_q",
+    "section": "bands.band_4",
+    "widget": "knob",
+    "labelKey": "",
+    "label": "Band 4 Q",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "b4_on",
+    "section": "bands.band_4",
+    "widget": "switch",
+    "labelKey": "",
+    "label": "Band 4 On",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "b5_type",
+    "section": "bands.band_5",
+    "widget": "auto",
+    "labelKey": "",
+    "label": "Band 5 Type",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "b5_freq",
+    "section": "bands.band_5",
+    "widget": "knob",
+    "labelKey": "",
+    "label": "Band 5 Frequency",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "b5_gain",
+    "section": "bands.band_5",
+    "widget": "knob",
+    "labelKey": "",
+    "label": "Band 5 Gain",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "b5_q",
+    "section": "bands.band_5",
+    "widget": "knob",
+    "labelKey": "",
+    "label": "Band 5 Q",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "b5_on",
+    "section": "bands.band_5",
+    "widget": "switch",
+    "labelKey": "",
+    "label": "Band 5 On",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "b6_type",
+    "section": "bands.band_6",
+    "widget": "auto",
+    "labelKey": "",
+    "label": "Band 6 Type",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "b6_freq",
+    "section": "bands.band_6",
+    "widget": "knob",
+    "labelKey": "",
+    "label": "Band 6 Frequency",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "b6_gain",
+    "section": "bands.band_6",
+    "widget": "knob",
+    "labelKey": "",
+    "label": "Band 6 Gain",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "b6_q",
+    "section": "bands.band_6",
+    "widget": "knob",
+    "labelKey": "",
+    "label": "Band 6 Q",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "b6_on",
+    "section": "bands.band_6",
+    "widget": "switch",
+    "labelKey": "",
+    "label": "Band 6 On",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "b7_type",
+    "section": "bands.band_7",
+    "widget": "auto",
+    "labelKey": "",
+    "label": "Band 7 Type",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "b7_freq",
+    "section": "bands.band_7",
+    "widget": "knob",
+    "labelKey": "",
+    "label": "Band 7 Frequency",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "b7_gain",
+    "section": "bands.band_7",
+    "widget": "knob",
+    "labelKey": "",
+    "label": "Band 7 Gain",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "b7_q",
+    "section": "bands.band_7",
+    "widget": "knob",
+    "labelKey": "",
+    "label": "Band 7 Q",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "b7_on",
+    "section": "bands.band_7",
+    "widget": "switch",
+    "labelKey": "",
+    "label": "Band 7 On",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "b8_type",
+    "section": "bands.band_8",
+    "widget": "auto",
+    "labelKey": "",
+    "label": "Band 8 Type",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "b8_freq",
+    "section": "bands.band_8",
+    "widget": "knob",
+    "labelKey": "",
+    "label": "Band 8 Frequency",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "b8_gain",
+    "section": "bands.band_8",
+    "widget": "knob",
+    "labelKey": "",
+    "label": "Band 8 Gain",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "b8_q",
+    "section": "bands.band_8",
+    "widget": "knob",
+    "labelKey": "",
+    "label": "Band 8 Q",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "b8_on",
+    "section": "bands.band_8",
+    "widget": "switch",
+    "labelKey": "",
+    "label": "Band 8 On",
+    "visibleWhen": null
+   }
+  ],
+  "meters": [],
+  "roles": [
+   {
+    "role": "hpf_freq",
+    "index": 0,
+    "symbol": "hpf_freq",
+    "unit": "hz"
+   },
+   {
+    "role": "lpf_freq",
+    "index": 0,
+    "symbol": "lpf_freq",
+    "unit": "hz"
+   },
+   {
+    "role": "band_freq",
+    "index": 0,
+    "symbol": "b1_freq",
+    "unit": "hz"
+   },
+   {
+    "role": "band_gain",
+    "index": 0,
+    "symbol": "b1_gain",
+    "unit": "db"
+   },
+   {
+    "role": "band_q",
+    "index": 0,
+    "symbol": "b1_q",
+    "unit": "none"
+   },
+   {
+    "role": "band_freq",
+    "index": 1,
+    "symbol": "b2_freq",
+    "unit": "hz"
+   },
+   {
+    "role": "band_gain",
+    "index": 1,
+    "symbol": "b2_gain",
+    "unit": "db"
+   },
+   {
+    "role": "band_q",
+    "index": 1,
+    "symbol": "b2_q",
+    "unit": "none"
+   },
+   {
+    "role": "band_freq",
+    "index": 2,
+    "symbol": "b3_freq",
+    "unit": "hz"
+   },
+   {
+    "role": "band_gain",
+    "index": 2,
+    "symbol": "b3_gain",
+    "unit": "db"
+   },
+   {
+    "role": "band_q",
+    "index": 2,
+    "symbol": "b3_q",
+    "unit": "none"
+   },
+   {
+    "role": "band_freq",
+    "index": 3,
+    "symbol": "b4_freq",
+    "unit": "hz"
+   },
+   {
+    "role": "band_gain",
+    "index": 3,
+    "symbol": "b4_gain",
+    "unit": "db"
+   },
+   {
+    "role": "band_q",
+    "index": 3,
+    "symbol": "b4_q",
+    "unit": "none"
+   },
+   {
+    "role": "band_freq",
+    "index": 4,
+    "symbol": "b5_freq",
+    "unit": "hz"
+   },
+   {
+    "role": "band_gain",
+    "index": 4,
+    "symbol": "b5_gain",
+    "unit": "db"
+   },
+   {
+    "role": "band_q",
+    "index": 4,
+    "symbol": "b5_q",
+    "unit": "none"
+   },
+   {
+    "role": "band_freq",
+    "index": 5,
+    "symbol": "b6_freq",
+    "unit": "hz"
+   },
+   {
+    "role": "band_gain",
+    "index": 5,
+    "symbol": "b6_gain",
+    "unit": "db"
+   },
+   {
+    "role": "band_q",
+    "index": 5,
+    "symbol": "b6_q",
+    "unit": "none"
+   },
+   {
+    "role": "band_freq",
+    "index": 6,
+    "symbol": "b7_freq",
+    "unit": "hz"
+   },
+   {
+    "role": "band_gain",
+    "index": 6,
+    "symbol": "b7_gain",
+    "unit": "db"
+   },
+   {
+    "role": "band_q",
+    "index": 6,
+    "symbol": "b7_q",
+    "unit": "none"
+   },
+   {
+    "role": "band_freq",
+    "index": 7,
+    "symbol": "b8_freq",
+    "unit": "hz"
+   },
+   {
+    "role": "band_gain",
+    "index": 7,
+    "symbol": "b8_gain",
+    "unit": "db"
+   },
+   {
+    "role": "band_q",
+    "index": 7,
+    "symbol": "b8_q",
+    "unit": "none"
+   }
+  ],
+  "displays": [
+   {
+    "kind": "eq_response",
+    "section": "bands.band_1",
+    "source": "family",
+    "meterIds": [
+     null,
+     null
+    ],
+    "curveIndex": null,
+    "floor": null,
+    "labelKey": "",
+    "label": "Bands / Band 1",
+    "basis": "modelled"
+   }
+  ],
+  "pages": [
+   {
+    "section": null,
+    "sectionName": "Easy",
+    "pageName": "Easy",
+    "ids": [
+     8,
+     13,
+     23,
+     28,
+     38,
+     43,
+     null,
+     null
+    ]
+   },
+   {
+    "section": 0,
+    "sectionName": "HPF",
+    "pageName": "HPF",
+    "ids": [
+     0,
+     1,
+     2,
+     null,
+     null,
+     null,
+     null,
+     null
+    ]
+   },
+   {
+    "section": 1,
+    "sectionName": "LPF",
+    "pageName": "LPF",
+    "ids": [
+     3,
+     4,
+     5,
+     null,
+     null,
+     null,
+     null,
+     null
+    ]
+   },
+   {
+    "section": 2,
+    "sectionName": "Bands / Band 1",
+    "pageName": "Bands / Band 1",
+    "ids": [
+     6,
+     7,
+     9,
+     10,
+     null,
+     null,
+     null,
+     null
+    ]
+   },
+   {
+    "section": 3,
+    "sectionName": "Bands / Band 2",
+    "pageName": "Bands / Band 2",
+    "ids": [
+     11,
+     12,
+     14,
+     15,
+     null,
+     null,
+     null,
+     null
+    ]
+   },
+   {
+    "section": 4,
+    "sectionName": "Bands / Band 3",
+    "pageName": "Bands / Band 3",
+    "ids": [
+     16,
+     17,
+     18,
+     19,
+     20,
+     null,
+     null,
+     null
+    ]
+   },
+   {
+    "section": 5,
+    "sectionName": "Bands / Band 4",
+    "pageName": "Bands / Band 4",
+    "ids": [
+     21,
+     22,
+     24,
+     25,
+     null,
+     null,
+     null,
+     null
+    ]
+   },
+   {
+    "section": 6,
+    "sectionName": "Bands / Band 5",
+    "pageName": "Bands / Band 5",
+    "ids": [
+     26,
+     27,
+     29,
+     30,
+     null,
+     null,
+     null,
+     null
+    ]
+   },
+   {
+    "section": 7,
+    "sectionName": "Bands / Band 6",
+    "pageName": "Bands / Band 6",
+    "ids": [
+     31,
+     32,
+     33,
+     34,
+     35,
+     null,
+     null,
+     null
+    ]
+   },
+   {
+    "section": 8,
+    "sectionName": "Bands / Band 7",
+    "pageName": "Bands / Band 7",
+    "ids": [
+     36,
+     37,
+     39,
+     40,
+     null,
+     null,
+     null,
+     null
+    ]
+   },
+   {
+    "section": 9,
+    "sectionName": "Bands / Band 8",
+    "pageName": "Bands / Band 8",
+    "ids": [
+     41,
+     42,
+     44,
+     45,
+     null,
+     null,
+     null,
+     null
+    ]
+   }
+  ]
+ }
+}

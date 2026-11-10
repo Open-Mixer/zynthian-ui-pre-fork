@@ -1,0 +1,1455 @@
+{
+ "layout": {
+  "origin": "authored",
+  "family": "none",
+  "sections": [
+   {
+    "key": "geq",
+    "labelKey": null,
+    "label": "Geq",
+    "bars": [
+     {
+      "controls": [
+       "band01",
+       "band02",
+       "band03",
+       "band04",
+       "band05",
+       "band06",
+       "band07",
+       "band08",
+       "band09",
+       "band10",
+       "band11",
+       "band12",
+       "band13",
+       "band14",
+       "band15",
+       "band16"
+      ],
+      "labels": [
+       "20 Hz",
+       "25 Hz",
+       "31.5 Hz",
+       "40 Hz",
+       "50 Hz",
+       "63 Hz",
+       "80 Hz",
+       "100 Hz",
+       "125 Hz",
+       "160 Hz",
+       "200 Hz",
+       "250 Hz",
+       "315 Hz",
+       "400 Hz",
+       "500 Hz",
+       "630 Hz"
+      ],
+      "tied": [
+       [],
+       [],
+       [],
+       [],
+       [],
+       [],
+       [],
+       [],
+       [],
+       [],
+       [],
+       [],
+       [],
+       [],
+       [],
+       []
+      ]
+     },
+     {
+      "controls": [
+       "band17",
+       "band18",
+       "band19",
+       "band20",
+       "band21",
+       "band22",
+       "band23",
+       "band24",
+       "band25",
+       "band26",
+       "band27",
+       "band28",
+       "band29",
+       "band30",
+       "band31"
+      ],
+      "labels": [
+       "800 Hz",
+       "1 kHz",
+       "1.25 kHz",
+       "1.6 kHz",
+       "2 kHz",
+       "2.5 kHz",
+       "3.15 kHz",
+       "4 kHz",
+       "5 kHz",
+       "6.3 kHz",
+       "8 kHz",
+       "10 kHz",
+       "12.5 kHz",
+       "16 kHz",
+       "20 kHz"
+      ],
+      "tied": [
+       [],
+       [],
+       [],
+       [],
+       [],
+       [],
+       [],
+       [],
+       [],
+       [],
+       [],
+       [],
+       [],
+       [],
+       []
+      ]
+     }
+    ]
+   }
+  ],
+  "controls": [
+   {
+    "symbol": "band01",
+    "param": 0,
+    "section": 0,
+    "sectionKey": "geq",
+    "widget": "knob",
+    "standard": {
+     "widget": "knob"
+    },
+    "labelKey": null,
+    "label": "20 Hz",
+    "visible": null,
+    "mask": "0",
+    "unit": "dB",
+    "meaning": "gain"
+   },
+   {
+    "symbol": "band02",
+    "param": 1,
+    "section": 0,
+    "sectionKey": "geq",
+    "widget": "knob",
+    "standard": {
+     "widget": "knob"
+    },
+    "labelKey": null,
+    "label": "25 Hz",
+    "visible": null,
+    "mask": "0",
+    "unit": "dB",
+    "meaning": "gain"
+   },
+   {
+    "symbol": "band03",
+    "param": 2,
+    "section": 0,
+    "sectionKey": "geq",
+    "widget": "knob",
+    "standard": {
+     "widget": "knob"
+    },
+    "labelKey": null,
+    "label": "31.5 Hz",
+    "visible": null,
+    "mask": "0",
+    "unit": "dB",
+    "meaning": "gain"
+   },
+   {
+    "symbol": "band04",
+    "param": 3,
+    "section": 0,
+    "sectionKey": "geq",
+    "widget": "knob",
+    "standard": {
+     "widget": "knob"
+    },
+    "labelKey": null,
+    "label": "40 Hz",
+    "visible": null,
+    "mask": "0",
+    "unit": "dB",
+    "meaning": "gain"
+   },
+   {
+    "symbol": "band05",
+    "param": 4,
+    "section": 0,
+    "sectionKey": "geq",
+    "widget": "knob",
+    "standard": {
+     "widget": "knob"
+    },
+    "labelKey": null,
+    "label": "50 Hz",
+    "visible": null,
+    "mask": "0",
+    "unit": "dB",
+    "meaning": "gain"
+   },
+   {
+    "symbol": "band06",
+    "param": 5,
+    "section": 0,
+    "sectionKey": "geq",
+    "widget": "knob",
+    "standard": {
+     "widget": "knob"
+    },
+    "labelKey": null,
+    "label": "63 Hz",
+    "visible": null,
+    "mask": "0",
+    "unit": "dB",
+    "meaning": "gain"
+   },
+   {
+    "symbol": "band07",
+    "param": 6,
+    "section": 0,
+    "sectionKey": "geq",
+    "widget": "knob",
+    "standard": {
+     "widget": "knob"
+    },
+    "labelKey": null,
+    "label": "80 Hz",
+    "visible": null,
+    "mask": "0",
+    "unit": "dB",
+    "meaning": "gain"
+   },
+   {
+    "symbol": "band08",
+    "param": 7,
+    "section": 0,
+    "sectionKey": "geq",
+    "widget": "knob",
+    "standard": {
+     "widget": "knob"
+    },
+    "labelKey": null,
+    "label": "100 Hz",
+    "visible": null,
+    "mask": "0",
+    "unit": "dB",
+    "meaning": "gain"
+   },
+   {
+    "symbol": "band09",
+    "param": 8,
+    "section": 0,
+    "sectionKey": "geq",
+    "widget": "knob",
+    "standard": {
+     "widget": "knob"
+    },
+    "labelKey": null,
+    "label": "125 Hz",
+    "visible": null,
+    "mask": "0",
+    "unit": "dB",
+    "meaning": "gain"
+   },
+   {
+    "symbol": "band10",
+    "param": 9,
+    "section": 0,
+    "sectionKey": "geq",
+    "widget": "knob",
+    "standard": {
+     "widget": "knob"
+    },
+    "labelKey": null,
+    "label": "160 Hz",
+    "visible": null,
+    "mask": "0",
+    "unit": "dB",
+    "meaning": "gain"
+   },
+   {
+    "symbol": "band11",
+    "param": 10,
+    "section": 0,
+    "sectionKey": "geq",
+    "widget": "knob",
+    "standard": {
+     "widget": "knob"
+    },
+    "labelKey": null,
+    "label": "200 Hz",
+    "visible": null,
+    "mask": "0",
+    "unit": "dB",
+    "meaning": "gain"
+   },
+   {
+    "symbol": "band12",
+    "param": 11,
+    "section": 0,
+    "sectionKey": "geq",
+    "widget": "knob",
+    "standard": {
+     "widget": "knob"
+    },
+    "labelKey": null,
+    "label": "250 Hz",
+    "visible": null,
+    "mask": "0",
+    "unit": "dB",
+    "meaning": "gain"
+   },
+   {
+    "symbol": "band13",
+    "param": 12,
+    "section": 0,
+    "sectionKey": "geq",
+    "widget": "knob",
+    "standard": {
+     "widget": "knob"
+    },
+    "labelKey": null,
+    "label": "315 Hz",
+    "visible": null,
+    "mask": "0",
+    "unit": "dB",
+    "meaning": "gain"
+   },
+   {
+    "symbol": "band14",
+    "param": 13,
+    "section": 0,
+    "sectionKey": "geq",
+    "widget": "knob",
+    "standard": {
+     "widget": "knob"
+    },
+    "labelKey": null,
+    "label": "400 Hz",
+    "visible": null,
+    "mask": "0",
+    "unit": "dB",
+    "meaning": "gain"
+   },
+   {
+    "symbol": "band15",
+    "param": 14,
+    "section": 0,
+    "sectionKey": "geq",
+    "widget": "knob",
+    "standard": {
+     "widget": "knob"
+    },
+    "labelKey": null,
+    "label": "500 Hz",
+    "visible": null,
+    "mask": "0",
+    "unit": "dB",
+    "meaning": "gain"
+   },
+   {
+    "symbol": "band16",
+    "param": 15,
+    "section": 0,
+    "sectionKey": "geq",
+    "widget": "knob",
+    "standard": {
+     "widget": "knob"
+    },
+    "labelKey": null,
+    "label": "630 Hz",
+    "visible": null,
+    "mask": "0",
+    "unit": "dB",
+    "meaning": "gain"
+   },
+   {
+    "symbol": "band17",
+    "param": 16,
+    "section": 0,
+    "sectionKey": "geq",
+    "widget": "knob",
+    "standard": {
+     "widget": "knob"
+    },
+    "labelKey": null,
+    "label": "800 Hz",
+    "visible": null,
+    "mask": "0",
+    "unit": "dB",
+    "meaning": "gain"
+   },
+   {
+    "symbol": "band18",
+    "param": 17,
+    "section": 0,
+    "sectionKey": "geq",
+    "widget": "knob",
+    "standard": {
+     "widget": "knob"
+    },
+    "labelKey": null,
+    "label": "1 kHz",
+    "visible": null,
+    "mask": "0",
+    "unit": "dB",
+    "meaning": "gain"
+   },
+   {
+    "symbol": "band19",
+    "param": 18,
+    "section": 0,
+    "sectionKey": "geq",
+    "widget": "knob",
+    "standard": {
+     "widget": "knob"
+    },
+    "labelKey": null,
+    "label": "1.25 kHz",
+    "visible": null,
+    "mask": "0",
+    "unit": "dB",
+    "meaning": "gain"
+   },
+   {
+    "symbol": "band20",
+    "param": 19,
+    "section": 0,
+    "sectionKey": "geq",
+    "widget": "knob",
+    "standard": {
+     "widget": "knob"
+    },
+    "labelKey": null,
+    "label": "1.6 kHz",
+    "visible": null,
+    "mask": "0",
+    "unit": "dB",
+    "meaning": "gain"
+   },
+   {
+    "symbol": "band21",
+    "param": 20,
+    "section": 0,
+    "sectionKey": "geq",
+    "widget": "knob",
+    "standard": {
+     "widget": "knob"
+    },
+    "labelKey": null,
+    "label": "2 kHz",
+    "visible": null,
+    "mask": "0",
+    "unit": "dB",
+    "meaning": "gain"
+   },
+   {
+    "symbol": "band22",
+    "param": 21,
+    "section": 0,
+    "sectionKey": "geq",
+    "widget": "knob",
+    "standard": {
+     "widget": "knob"
+    },
+    "labelKey": null,
+    "label": "2.5 kHz",
+    "visible": null,
+    "mask": "0",
+    "unit": "dB",
+    "meaning": "gain"
+   },
+   {
+    "symbol": "band23",
+    "param": 22,
+    "section": 0,
+    "sectionKey": "geq",
+    "widget": "knob",
+    "standard": {
+     "widget": "knob"
+    },
+    "labelKey": null,
+    "label": "3.15 kHz",
+    "visible": null,
+    "mask": "0",
+    "unit": "dB",
+    "meaning": "gain"
+   },
+   {
+    "symbol": "band24",
+    "param": 23,
+    "section": 0,
+    "sectionKey": "geq",
+    "widget": "knob",
+    "standard": {
+     "widget": "knob"
+    },
+    "labelKey": null,
+    "label": "4 kHz",
+    "visible": null,
+    "mask": "0",
+    "unit": "dB",
+    "meaning": "gain"
+   },
+   {
+    "symbol": "band25",
+    "param": 24,
+    "section": 0,
+    "sectionKey": "geq",
+    "widget": "knob",
+    "standard": {
+     "widget": "knob"
+    },
+    "labelKey": null,
+    "label": "5 kHz",
+    "visible": null,
+    "mask": "0",
+    "unit": "dB",
+    "meaning": "gain"
+   },
+   {
+    "symbol": "band26",
+    "param": 25,
+    "section": 0,
+    "sectionKey": "geq",
+    "widget": "knob",
+    "standard": {
+     "widget": "knob"
+    },
+    "labelKey": null,
+    "label": "6.3 kHz",
+    "visible": null,
+    "mask": "0",
+    "unit": "dB",
+    "meaning": "gain"
+   },
+   {
+    "symbol": "band27",
+    "param": 26,
+    "section": 0,
+    "sectionKey": "geq",
+    "widget": "knob",
+    "standard": {
+     "widget": "knob"
+    },
+    "labelKey": null,
+    "label": "8 kHz",
+    "visible": null,
+    "mask": "0",
+    "unit": "dB",
+    "meaning": "gain"
+   },
+   {
+    "symbol": "band28",
+    "param": 27,
+    "section": 0,
+    "sectionKey": "geq",
+    "widget": "knob",
+    "standard": {
+     "widget": "knob"
+    },
+    "labelKey": null,
+    "label": "10 kHz",
+    "visible": null,
+    "mask": "0",
+    "unit": "dB",
+    "meaning": "gain"
+   },
+   {
+    "symbol": "band29",
+    "param": 28,
+    "section": 0,
+    "sectionKey": "geq",
+    "widget": "knob",
+    "standard": {
+     "widget": "knob"
+    },
+    "labelKey": null,
+    "label": "12.5 kHz",
+    "visible": null,
+    "mask": "0",
+    "unit": "dB",
+    "meaning": "gain"
+   },
+   {
+    "symbol": "band30",
+    "param": 29,
+    "section": 0,
+    "sectionKey": "geq",
+    "widget": "knob",
+    "standard": {
+     "widget": "knob"
+    },
+    "labelKey": null,
+    "label": "16 kHz",
+    "visible": null,
+    "mask": "0",
+    "unit": "dB",
+    "meaning": "gain"
+   },
+   {
+    "symbol": "band31",
+    "param": 30,
+    "section": 0,
+    "sectionKey": "geq",
+    "widget": "knob",
+    "standard": {
+     "widget": "knob"
+    },
+    "labelKey": null,
+    "label": "20 kHz",
+    "visible": null,
+    "mask": "0",
+    "unit": "dB",
+    "meaning": "gain"
+   }
+  ],
+  "roles": [],
+  "unpublished": [],
+  "displays": [],
+  "defaults": [],
+  "ports": {
+   "inputs": [
+    {
+     "id": 0,
+     "name": "in",
+     "role": "main",
+     "channels": 2
+    }
+   ],
+   "outputs": [
+    {
+     "id": 0,
+     "name": "out",
+     "role": "main",
+     "channels": 2
+    }
+   ],
+   "sidechain": false,
+   "notes": false
+  },
+  "easy": [
+   "band01",
+   "band02",
+   "band03",
+   "band04"
+  ],
+  "meters": [],
+  "meterRefusals": []
+ },
+ "description": {
+  "family": "none",
+  "fingerprint": "09ca91cc49cd7251b107e5a6c8a99ff61371fdbda38a31feac97c53567421d30",
+  "easy": [
+   "band01",
+   "band02",
+   "band03",
+   "band04"
+  ],
+  "params": [
+   {
+    "kind": "number",
+    "symbol": "band01",
+    "name": "20 Hz",
+    "unit": "db",
+    "scale": "linear",
+    "step": 0,
+    "min": -15,
+    "max": 15,
+    "default": 0
+   },
+   {
+    "kind": "number",
+    "symbol": "band02",
+    "name": "25 Hz",
+    "unit": "db",
+    "scale": "linear",
+    "step": 0,
+    "min": -15,
+    "max": 15,
+    "default": 0
+   },
+   {
+    "kind": "number",
+    "symbol": "band03",
+    "name": "31.5 Hz",
+    "unit": "db",
+    "scale": "linear",
+    "step": 0,
+    "min": -15,
+    "max": 15,
+    "default": 0
+   },
+   {
+    "kind": "number",
+    "symbol": "band04",
+    "name": "40 Hz",
+    "unit": "db",
+    "scale": "linear",
+    "step": 0,
+    "min": -15,
+    "max": 15,
+    "default": 0
+   },
+   {
+    "kind": "number",
+    "symbol": "band05",
+    "name": "50 Hz",
+    "unit": "db",
+    "scale": "linear",
+    "step": 0,
+    "min": -15,
+    "max": 15,
+    "default": 0
+   },
+   {
+    "kind": "number",
+    "symbol": "band06",
+    "name": "63 Hz",
+    "unit": "db",
+    "scale": "linear",
+    "step": 0,
+    "min": -15,
+    "max": 15,
+    "default": 0
+   },
+   {
+    "kind": "number",
+    "symbol": "band07",
+    "name": "80 Hz",
+    "unit": "db",
+    "scale": "linear",
+    "step": 0,
+    "min": -15,
+    "max": 15,
+    "default": 0
+   },
+   {
+    "kind": "number",
+    "symbol": "band08",
+    "name": "100 Hz",
+    "unit": "db",
+    "scale": "linear",
+    "step": 0,
+    "min": -15,
+    "max": 15,
+    "default": 0
+   },
+   {
+    "kind": "number",
+    "symbol": "band09",
+    "name": "125 Hz",
+    "unit": "db",
+    "scale": "linear",
+    "step": 0,
+    "min": -15,
+    "max": 15,
+    "default": 0
+   },
+   {
+    "kind": "number",
+    "symbol": "band10",
+    "name": "160 Hz",
+    "unit": "db",
+    "scale": "linear",
+    "step": 0,
+    "min": -15,
+    "max": 15,
+    "default": 0
+   },
+   {
+    "kind": "number",
+    "symbol": "band11",
+    "name": "200 Hz",
+    "unit": "db",
+    "scale": "linear",
+    "step": 0,
+    "min": -15,
+    "max": 15,
+    "default": 0
+   },
+   {
+    "kind": "number",
+    "symbol": "band12",
+    "name": "250 Hz",
+    "unit": "db",
+    "scale": "linear",
+    "step": 0,
+    "min": -15,
+    "max": 15,
+    "default": 0
+   },
+   {
+    "kind": "number",
+    "symbol": "band13",
+    "name": "315 Hz",
+    "unit": "db",
+    "scale": "linear",
+    "step": 0,
+    "min": -15,
+    "max": 15,
+    "default": 0
+   },
+   {
+    "kind": "number",
+    "symbol": "band14",
+    "name": "400 Hz",
+    "unit": "db",
+    "scale": "linear",
+    "step": 0,
+    "min": -15,
+    "max": 15,
+    "default": 0
+   },
+   {
+    "kind": "number",
+    "symbol": "band15",
+    "name": "500 Hz",
+    "unit": "db",
+    "scale": "linear",
+    "step": 0,
+    "min": -15,
+    "max": 15,
+    "default": 0
+   },
+   {
+    "kind": "number",
+    "symbol": "band16",
+    "name": "630 Hz",
+    "unit": "db",
+    "scale": "linear",
+    "step": 0,
+    "min": -15,
+    "max": 15,
+    "default": 0
+   },
+   {
+    "kind": "number",
+    "symbol": "band17",
+    "name": "800 Hz",
+    "unit": "db",
+    "scale": "linear",
+    "step": 0,
+    "min": -15,
+    "max": 15,
+    "default": 0
+   },
+   {
+    "kind": "number",
+    "symbol": "band18",
+    "name": "1 kHz",
+    "unit": "db",
+    "scale": "linear",
+    "step": 0,
+    "min": -15,
+    "max": 15,
+    "default": 0
+   },
+   {
+    "kind": "number",
+    "symbol": "band19",
+    "name": "1.25 kHz",
+    "unit": "db",
+    "scale": "linear",
+    "step": 0,
+    "min": -15,
+    "max": 15,
+    "default": 0
+   },
+   {
+    "kind": "number",
+    "symbol": "band20",
+    "name": "1.6 kHz",
+    "unit": "db",
+    "scale": "linear",
+    "step": 0,
+    "min": -15,
+    "max": 15,
+    "default": 0
+   },
+   {
+    "kind": "number",
+    "symbol": "band21",
+    "name": "2 kHz",
+    "unit": "db",
+    "scale": "linear",
+    "step": 0,
+    "min": -15,
+    "max": 15,
+    "default": 0
+   },
+   {
+    "kind": "number",
+    "symbol": "band22",
+    "name": "2.5 kHz",
+    "unit": "db",
+    "scale": "linear",
+    "step": 0,
+    "min": -15,
+    "max": 15,
+    "default": 0
+   },
+   {
+    "kind": "number",
+    "symbol": "band23",
+    "name": "3.15 kHz",
+    "unit": "db",
+    "scale": "linear",
+    "step": 0,
+    "min": -15,
+    "max": 15,
+    "default": 0
+   },
+   {
+    "kind": "number",
+    "symbol": "band24",
+    "name": "4 kHz",
+    "unit": "db",
+    "scale": "linear",
+    "step": 0,
+    "min": -15,
+    "max": 15,
+    "default": 0
+   },
+   {
+    "kind": "number",
+    "symbol": "band25",
+    "name": "5 kHz",
+    "unit": "db",
+    "scale": "linear",
+    "step": 0,
+    "min": -15,
+    "max": 15,
+    "default": 0
+   },
+   {
+    "kind": "number",
+    "symbol": "band26",
+    "name": "6.3 kHz",
+    "unit": "db",
+    "scale": "linear",
+    "step": 0,
+    "min": -15,
+    "max": 15,
+    "default": 0
+   },
+   {
+    "kind": "number",
+    "symbol": "band27",
+    "name": "8 kHz",
+    "unit": "db",
+    "scale": "linear",
+    "step": 0,
+    "min": -15,
+    "max": 15,
+    "default": 0
+   },
+   {
+    "kind": "number",
+    "symbol": "band28",
+    "name": "10 kHz",
+    "unit": "db",
+    "scale": "linear",
+    "step": 0,
+    "min": -15,
+    "max": 15,
+    "default": 0
+   },
+   {
+    "kind": "number",
+    "symbol": "band29",
+    "name": "12.5 kHz",
+    "unit": "db",
+    "scale": "linear",
+    "step": 0,
+    "min": -15,
+    "max": 15,
+    "default": 0
+   },
+   {
+    "kind": "number",
+    "symbol": "band30",
+    "name": "16 kHz",
+    "unit": "db",
+    "scale": "linear",
+    "step": 0,
+    "min": -15,
+    "max": 15,
+    "default": 0
+   },
+   {
+    "kind": "number",
+    "symbol": "band31",
+    "name": "20 kHz",
+    "unit": "db",
+    "scale": "linear",
+    "step": 0,
+    "min": -15,
+    "max": 15,
+    "default": 0
+   }
+  ],
+  "sections": [
+   {
+    "key": "geq",
+    "labelKey": "",
+    "label": "Geq",
+    "bars": [
+     {
+      "controls": [
+       "band01",
+       "band02",
+       "band03",
+       "band04",
+       "band05",
+       "band06",
+       "band07",
+       "band08",
+       "band09",
+       "band10",
+       "band11",
+       "band12",
+       "band13",
+       "band14",
+       "band15",
+       "band16"
+      ],
+      "labels": [
+       "20 Hz",
+       "25 Hz",
+       "31.5 Hz",
+       "40 Hz",
+       "50 Hz",
+       "63 Hz",
+       "80 Hz",
+       "100 Hz",
+       "125 Hz",
+       "160 Hz",
+       "200 Hz",
+       "250 Hz",
+       "315 Hz",
+       "400 Hz",
+       "500 Hz",
+       "630 Hz"
+      ],
+      "tied": [
+       [],
+       [],
+       [],
+       [],
+       [],
+       [],
+       [],
+       [],
+       [],
+       [],
+       [],
+       [],
+       [],
+       [],
+       [],
+       []
+      ]
+     },
+     {
+      "controls": [
+       "band17",
+       "band18",
+       "band19",
+       "band20",
+       "band21",
+       "band22",
+       "band23",
+       "band24",
+       "band25",
+       "band26",
+       "band27",
+       "band28",
+       "band29",
+       "band30",
+       "band31"
+      ],
+      "labels": [
+       "800 Hz",
+       "1 kHz",
+       "1.25 kHz",
+       "1.6 kHz",
+       "2 kHz",
+       "2.5 kHz",
+       "3.15 kHz",
+       "4 kHz",
+       "5 kHz",
+       "6.3 kHz",
+       "8 kHz",
+       "10 kHz",
+       "12.5 kHz",
+       "16 kHz",
+       "20 kHz"
+      ],
+      "tied": [
+       [],
+       [],
+       [],
+       [],
+       [],
+       [],
+       [],
+       [],
+       [],
+       [],
+       [],
+       [],
+       [],
+       [],
+       []
+      ]
+     }
+    ]
+   }
+  ],
+  "controls": [
+   {
+    "symbol": "band01",
+    "section": "geq",
+    "widget": "knob",
+    "labelKey": "",
+    "label": "20 Hz",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "band02",
+    "section": "geq",
+    "widget": "knob",
+    "labelKey": "",
+    "label": "25 Hz",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "band03",
+    "section": "geq",
+    "widget": "knob",
+    "labelKey": "",
+    "label": "31.5 Hz",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "band04",
+    "section": "geq",
+    "widget": "knob",
+    "labelKey": "",
+    "label": "40 Hz",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "band05",
+    "section": "geq",
+    "widget": "knob",
+    "labelKey": "",
+    "label": "50 Hz",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "band06",
+    "section": "geq",
+    "widget": "knob",
+    "labelKey": "",
+    "label": "63 Hz",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "band07",
+    "section": "geq",
+    "widget": "knob",
+    "labelKey": "",
+    "label": "80 Hz",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "band08",
+    "section": "geq",
+    "widget": "knob",
+    "labelKey": "",
+    "label": "100 Hz",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "band09",
+    "section": "geq",
+    "widget": "knob",
+    "labelKey": "",
+    "label": "125 Hz",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "band10",
+    "section": "geq",
+    "widget": "knob",
+    "labelKey": "",
+    "label": "160 Hz",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "band11",
+    "section": "geq",
+    "widget": "knob",
+    "labelKey": "",
+    "label": "200 Hz",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "band12",
+    "section": "geq",
+    "widget": "knob",
+    "labelKey": "",
+    "label": "250 Hz",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "band13",
+    "section": "geq",
+    "widget": "knob",
+    "labelKey": "",
+    "label": "315 Hz",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "band14",
+    "section": "geq",
+    "widget": "knob",
+    "labelKey": "",
+    "label": "400 Hz",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "band15",
+    "section": "geq",
+    "widget": "knob",
+    "labelKey": "",
+    "label": "500 Hz",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "band16",
+    "section": "geq",
+    "widget": "knob",
+    "labelKey": "",
+    "label": "630 Hz",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "band17",
+    "section": "geq",
+    "widget": "knob",
+    "labelKey": "",
+    "label": "800 Hz",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "band18",
+    "section": "geq",
+    "widget": "knob",
+    "labelKey": "",
+    "label": "1 kHz",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "band19",
+    "section": "geq",
+    "widget": "knob",
+    "labelKey": "",
+    "label": "1.25 kHz",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "band20",
+    "section": "geq",
+    "widget": "knob",
+    "labelKey": "",
+    "label": "1.6 kHz",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "band21",
+    "section": "geq",
+    "widget": "knob",
+    "labelKey": "",
+    "label": "2 kHz",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "band22",
+    "section": "geq",
+    "widget": "knob",
+    "labelKey": "",
+    "label": "2.5 kHz",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "band23",
+    "section": "geq",
+    "widget": "knob",
+    "labelKey": "",
+    "label": "3.15 kHz",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "band24",
+    "section": "geq",
+    "widget": "knob",
+    "labelKey": "",
+    "label": "4 kHz",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "band25",
+    "section": "geq",
+    "widget": "knob",
+    "labelKey": "",
+    "label": "5 kHz",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "band26",
+    "section": "geq",
+    "widget": "knob",
+    "labelKey": "",
+    "label": "6.3 kHz",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "band27",
+    "section": "geq",
+    "widget": "knob",
+    "labelKey": "",
+    "label": "8 kHz",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "band28",
+    "section": "geq",
+    "widget": "knob",
+    "labelKey": "",
+    "label": "10 kHz",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "band29",
+    "section": "geq",
+    "widget": "knob",
+    "labelKey": "",
+    "label": "12.5 kHz",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "band30",
+    "section": "geq",
+    "widget": "knob",
+    "labelKey": "",
+    "label": "16 kHz",
+    "visibleWhen": null
+   },
+   {
+    "symbol": "band31",
+    "section": "geq",
+    "widget": "knob",
+    "labelKey": "",
+    "label": "20 kHz",
+    "visibleWhen": null
+   }
+  ],
+  "meters": [],
+  "roles": [],
+  "displays": [],
+  "pages": [
+   {
+    "section": null,
+    "sectionName": "Easy",
+    "pageName": "Easy",
+    "ids": [
+     0,
+     1,
+     2,
+     3,
+     null,
+     null,
+     null,
+     null
+    ]
+   },
+   {
+    "section": 0,
+    "sectionName": "Geq",
+    "pageName": "Geq: 50 Hz - 250 Hz",
+    "ids": [
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10,
+     11
+    ]
+   },
+   {
+    "section": 0,
+    "sectionName": "Geq",
+    "pageName": "Geq: 315 Hz - 1.6 kHz",
+    "ids": [
+     12,
+     13,
+     14,
+     15,
+     16,
+     17,
+     18,
+     19
+    ]
+   },
+   {
+    "section": 0,
+    "sectionName": "Geq",
+    "pageName": "Geq: 2 kHz - 10 kHz",
+    "ids": [
+     20,
+     21,
+     22,
+     23,
+     24,
+     25,
+     26,
+     27
+    ]
+   },
+   {
+    "section": 0,
+    "sectionName": "Geq",
+    "pageName": "Geq: 12.5 kHz - 20 kHz",
+    "ids": [
+     28,
+     29,
+     30,
+     null,
+     null,
+     null,
+     null,
+     null
+    ]
+   }
+  ]
+ }
+}
